@@ -1,0 +1,53 @@
+name: Bitget Demo Bot Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      BITGET_API_KEY: ${{ secrets.BITGET_API_KEY }}
+      BITGET_SECRET_KEY: ${{ secrets.BITGET_SECRET_KEY }}
+      BITGET_PASSPHRASE: ${{ secrets.BITGET_PASSPHRASE }}
+      BITGET_SYMBOL: BTCUSDT
+      BITGET_INTERVAL: 5m
+      TRADE_AMOUNT_USDT: "10"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Check Bitget credentials
+        run: |
+          python - <<'PY'
+          import os
+          missing = [
+              name for name in (
+                  "BITGET_API_KEY",
+                  "BITGET_SECRET_KEY",
+                  "BITGET_PASSPHRASE",
+              )
+              if not os.getenv(name)
+          ]
+          if missing:
+              raise SystemExit(
+                  "Missing GitHub Secrets: " + ", ".join(missing)
+              )
+          print("Bitget credentials are present.")
+          PY
+
+      - name: Run bot
+        run: python main.py
