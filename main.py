@@ -290,9 +290,10 @@ def main():
             signal, price = get_signal()
             ticker = get_ticker()
 
-            last_price = ticker.get("lastPr") or ticker.get("lastPrice")
+            # UTA v3 ticker field is lastPrice.
+            last_price = ticker.get("lastPrice")
             if last_price is None:
-                raise RuntimeError("Ticker response did not contain lastPr.")
+                raise RuntimeError("Ticker response did not contain lastPrice.")
 
             live_price = float(last_price)
 
