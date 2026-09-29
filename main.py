@@ -107,8 +107,25 @@ def private_request(method, path, params=None):
         timeout=15
     )
 
-    response.raise_for_status()
-    return response.json()
+    try:
+        data = response.json()
+    except ValueError:
+        response.raise_for_status()
+        raise RuntimeError(f"Bitget returned non-JSON response (HTTP {response.status_code}).")
+
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"Bitget HTTP {response.status_code}: "
+            f"{data.get('msg', data)}"
+        )
+
+    if data.get("code") != "00000":
+        raise RuntimeError(
+            f"Bitget API error {data.get('code')}: "
+            f"{data.get('msg', 'Unknown error')}"
+        )
+
+    return data
 
 
 # ------------------------------------------------------------
@@ -133,7 +150,10 @@ def get_candles():
     data = response.json()
 
     if data.get("code") != "00000":
-        raise RuntimeError(data)
+        raise RuntimeError(
+            f"Bitget candles error {data.get('code')}: "
+            f"{data.get('msg', 'Unknown error')}"
+        )
 
     return data["data"]
 
@@ -154,7 +174,10 @@ def get_ticker():
     data = response.json()
 
     if data.get("code") != "00000":
-        raise RuntimeError(data)
+        raise RuntimeError(
+            f"Bitget ticker error {data.get('code')}: "
+            f"{data.get('msg', 'Unknown error')}"
+        )
 
     if not data["data"]:
         raise RuntimeError("No ticker data returned.")
@@ -267,7 +290,11 @@ def main():
             signal, price = get_signal()
             ticker = get_ticker()
 
-            live_price = float(ticker["lastPrice"])
+            last_price = ticker.get("lastPr") or ticker.get("lastPrice")
+            if last_price is None:
+                raise RuntimeError("Ticker response did not contain lastPr.")
+
+            live_price = float(last_price)
 
             now = datetime.now(timezone.utc).strftime(
                 "%Y-%m-%d %H:%M:%S UTC"
