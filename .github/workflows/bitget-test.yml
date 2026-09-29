@@ -6,7 +6,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
 
     env:
       BITGET_API_KEY: ${{ secrets.BITGET_API_KEY }}
@@ -49,5 +49,24 @@ jobs:
           print("Bitget credentials are present.")
           PY
 
-      - name: Run bot
-        run: python main.py
+      - name: Test Bitget connection
+        run: |
+          python - <<'PY'
+          import json
+          import main
+
+          print("Testing public market data...")
+          candles = main.get_candles()
+          ticker = main.get_ticker()
+
+          print("Candles received:", len(candles))
+          print("BTCUSDT last price:", ticker.get("lastPrice"))
+
+          print("Testing authenticated account access...")
+          assets = main.private_request("GET", "/api/v3/account/assets")
+          print("Authenticated account request: SUCCESS")
+
+          # Do not print balances or API credentials into GitHub logs.
+          print("Bitget Demo connection test: PASSED")
+          print("No order was placed by this test.")
+          PY
