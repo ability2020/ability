@@ -66,7 +66,13 @@ jobs:
           assets = main.private_request("GET", "/api/v3/account/assets")
           print("Authenticated account request: SUCCESS")
 
+          usdt = main.get_available_balance("USDT")
+          btc = main.get_available_balance("BTC")
+          print("USDT balance check: SUCCESS")
+          print("BTC balance check: SUCCESS")
+          print("Balance values are intentionally not printed.")
+
           # Do not print balances or API credentials into GitHub logs.
-          print("Bitget Demo connection test: PASSED")
+          print("Bitget Demo connection and balance test: PASSED")
           print("No order was placed by this test.")
           PY
