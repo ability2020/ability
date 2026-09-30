@@ -129,6 +129,29 @@ def private_request(method, path, params=None):
 
 
 # ------------------------------------------------------------
+# Account balances
+# ------------------------------------------------------------
+
+def get_account_assets():
+    return private_request(
+        "GET",
+        "/api/v3/account/assets"
+    )
+
+
+def get_available_balance(coin):
+    assets = get_account_assets().get("data", [])
+
+    for asset in assets:
+        asset_coin = str(asset.get("coin", "")).upper()
+        if asset_coin == coin.upper():
+            # UTA account assets expose available balance directly.
+            return float(asset.get("available", "0"))
+
+    return 0.0
+
+
+# ------------------------------------------------------------
 # Public market data
 # ------------------------------------------------------------
 
@@ -316,7 +339,15 @@ def main():
             if signal == "BUY" and last_signal != "BUY":
                 print("BUY signal detected.")
 
-                if DEMO_TRADING:
+                usdt_available = get_available_balance("USDT")
+                print(f"Available USDT: {usdt_available:.8f}")
+
+                if usdt_available < TRADE_AMOUNT_USDT:
+                    print(
+                        "BUY blocked: insufficient available USDT "
+                        f"(need {TRADE_AMOUNT_USDT:.2f})."
+                    )
+                elif DEMO_TRADING:
                     result = place_market_buy(live_price)
                     print("DEMO BUY RESPONSE:")
                     print(json.dumps(result, indent=2))
@@ -326,9 +357,18 @@ def main():
             elif signal == "SELL":
                 print("SELL signal detected.")
 
-                # We do not automatically sell yet because the
-                # bot must first know the actual BTC balance.
-                print("Automatic SELL is currently disabled.")
+                btc_available = get_available_balance("BTC")
+                print(f"Available BTC: {btc_available:.8f}")
+
+                # Automatic SELL remains disabled until the
+                # position/risk logic is implemented and tested.
+                if btc_available <= 0:
+                    print("SELL blocked: no available BTC balance.")
+                else:
+                    print(
+                        "Automatic SELL is still disabled; "
+                        "BTC balance check passed."
+                    )
 
             last_signal = signal
 
