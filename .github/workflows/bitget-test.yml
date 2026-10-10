@@ -129,3 +129,6 @@ jobs:
           print("Bitget connection, balance, indicator and risk tests: PASSED")
           print("No order was placed by this test.")
           PY
+
+      - name: Run bot signal check (one cycle, no orders)
+        run: python main.py --once
