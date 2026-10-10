@@ -73,6 +73,20 @@ jobs:
           print("Balance values are intentionally not printed.")
 
           # Do not print balances or API credentials into GitHub logs.
-          print("Bitget Demo connection and balance test: PASSED")
+          print("Testing indicator strategy (signal-only)...")
+          signal, signal_price, details = main.get_signal()
+          if signal not in ("BUY", "SELL", "WAIT"):
+              raise SystemExit("Unexpected signal: " + str(signal))
+          if signal_price is None or signal_price <= 0:
+              raise SystemExit("Signal test did not return a valid price.")
+          print("Indicator signal:", signal)
+          if "indicator_score" in details:
+              print("Indicator score:", details["indicator_score"])
+              print("RSI-14:", round(details["rsi_14"], 2))
+          else:
+              print("Indicator note:", details.get("reason", "Indicators unavailable"))
+              raise SystemExit("Indicator test did not calculate indicators.")
+
+          print("Bitget connection, balance and indicator tests: PASSED")
           print("No order was placed by this test.")
           PY
