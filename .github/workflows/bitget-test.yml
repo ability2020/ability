@@ -55,7 +55,6 @@ jobs:
       - name: Test Bitget connection
         run: |
           python - <<'PY'
-          import json
           import time
           import main
 
@@ -67,16 +66,15 @@ jobs:
           print("BTCUSDT last price:", ticker.get("lastPrice"))
 
           print("Testing authenticated account access...")
-          assets = main.private_request("GET", "/api/v3/account/assets")
+          main.private_request("GET", "/api/v3/account/assets")
           print("Authenticated account request: SUCCESS")
 
-          usdt = main.get_available_balance("USDT")
-          btc = main.get_available_balance("BTC")
+          main.get_available_balance("USDT")
+          main.get_available_balance("BTC")
           print("USDT balance check: SUCCESS")
           print("BTC balance check: SUCCESS")
           print("Balance values are intentionally not printed.")
 
-          # Do not print balances or API credentials into GitHub logs.
           print("Testing indicator strategy (signal-only)...")
           signal, signal_price, details = main.get_signal()
           if signal not in ("BUY", "SELL", "WAIT"):
@@ -202,6 +200,37 @@ jobs:
           print("Closed simulated trades recorded:", len(updated["closed_trades"]))
           PY
 
+      - name: Create paper-trading performance report
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          import paper_trader
+
+          state = paper_trader.load_state()
+          report = {
+              "report_type": "paper-trading-only",
+              "created_at_utc": datetime.now(timezone.utc).isoformat(),
+              "github_run_id": os.getenv("GITHUB_RUN_ID"),
+              "github_run_number": os.getenv("GITHUB_RUN_NUMBER"),
+              "symbol": os.getenv("BITGET_SYMBOL", "BTCUSDT"),
+              "interval": os.getenv("BITGET_INTERVAL", "5m"),
+              "realized_pnl_usdt_gross": state["realized_pnl_usdt"],
+              "closed_trade_count": len(state["closed_trades"]),
+              "open_position": state["position"],
+              "closed_trades": state["closed_trades"],
+              "note": "Simulated results only; excludes real exchange execution and may exclude fees/slippage.",
+          }
+          with open("paper_report.json", "w", encoding="utf-8") as file:
+              json.dump(report, file, indent=2, allow_nan=False)
+          print("Paper-trading report created.")
+          print("Closed simulated trades:", report["closed_trade_count"])
+          print("Simulated realized PnL (USDT):", round(report["realized_pnl_usdt_gross"], 6))
+          print("This report contains simulated trading data only.")
+          PY
+
       - name: Demonstrate a synthetic paper trade (offline only)
         run: |
           python - <<'PY'
@@ -239,3 +268,12 @@ jobs:
             bot_state.json
             paper_state.json
           key: bitget-bot-state-${{ github.ref_name }}-${{ github.run_id }}
+
+      - name: Upload paper-trading report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-trading-report-run-${{ github.run_number }}
+          path: paper_report.json
+          if-no-files-found: warn
+          retention-days: 30
