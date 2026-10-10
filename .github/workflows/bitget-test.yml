@@ -87,6 +87,22 @@ jobs:
               print("Indicator note:", details.get("reason", "Indicators unavailable"))
               raise SystemExit("Indicator test did not calculate indicators.")
 
-          print("Bitget connection, balance and indicator tests: PASSED")
+          print("Testing decision-only risk engine...")
+          buy_details = {"indicator_score": 2}
+          decision, reason = main.evaluate_risk("BUY", 100.0, buy_details, 20.0, 0.0)
+          if decision != "BUY_CANDIDATE":
+              raise SystemExit("Risk engine rejected a valid test BUY candidate: " + reason)
+
+          decision, reason = main.evaluate_risk("BUY", 100.0, buy_details, 0.0, 0.0)
+          if decision != "WAIT":
+              raise SystemExit("Risk engine failed to block BUY with insufficient USDT.")
+
+          sell_details = {"indicator_score": -2}
+          decision, reason = main.evaluate_risk("SELL", 100.0, sell_details, 20.0, 0.0)
+          if decision != "WAIT":
+              raise SystemExit("Risk engine failed to block SELL without BTC.")
+
+          print("Risk engine tests: PASSED")
+          print("Bitget connection, balance, indicator and risk tests: PASSED")
           print("No order was placed by this test.")
           PY
