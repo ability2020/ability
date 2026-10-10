@@ -222,19 +222,22 @@ jobs:
               "signal_reason": details.get("reason"),
               "risk_decision": risk_decision,
               "risk_reason": risk_reason,
+              "risk_decision_scope": "Exchange-account candidate check only; it does not control the offline paper simulator.",
+              "paper_trading_mode": "Independent simulated position; no exchange order is sent.",
               "paper_event": event,
               "paper_event_reason": reason,
               "simulated_realized_pnl_usdt_gross": updated["realized_pnl_usdt"],
               "closed_trade_count": len(updated["closed_trades"]),
               "open_position": updated["position"],
-              "note": "Signal from retrieved market data; paper-trading only. No exchange order was sent."
+              "note": "Signal from retrieved market data. Paper simulation uses its own hypothetical position and is independent of real BTC/USDT account balances. No exchange order was sent."
           }
           with open("paper_signal.json", "w", encoding="utf-8") as file:
               json.dump(signal_record, file, indent=2, allow_nan=False)
 
           print("PAPER-TRADING ONLY — no Bitget order endpoint called.")
           print("Signal:", signal)
-          print("Risk decision:", risk_decision, "—", risk_reason)
+          print("Exchange-account risk candidate:", risk_decision, "—", risk_reason)
+          print("Paper simulation uses its own hypothetical position, independent of real account balances.")
           print("Paper event:", event)
           print("Reason:", reason)
           print("Simulated realized PnL (USDT):", round(updated["realized_pnl_usdt"], 6))
@@ -271,7 +274,7 @@ jobs:
               "closed_trade_count": len(state["closed_trades"]),
               "open_position": state["position"],
               "closed_trades": state["closed_trades"],
-              "note": "Simulated results only; the latest signal is based on retrieved market data. No exchange order is sent. PnL is gross and may exclude fees/slippage.",
+              "note": "Simulated results only. Paper positions are hypothetical and independent of real exchange balances. The account risk decision is informational and does not control the offline paper simulator. No exchange order is sent. PnL is gross and may exclude fees/slippage.",
           }
           with open("paper_report.json", "w", encoding="utf-8") as file:
               json.dump(report, file, indent=2, allow_nan=False)
