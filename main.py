@@ -97,7 +97,7 @@ def private_request(method, path, params=None):
 
     # Bitget demo trading
     if DEMO_TRADING:
-        headers["X-SIMULATE-TRADING"] = "1"
+        headers["paptrading"] = "1"
 
     response = requests.request(
         method=method.upper(),
