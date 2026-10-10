@@ -327,6 +327,48 @@ def get_signal():
 
 
 # ------------------------------------------------------------
+# Risk engine (decision-only; never places orders)
+# ------------------------------------------------------------
+
+def evaluate_risk(signal, price, details, usdt_balance, btc_balance):
+    """
+    Convert an indicator signal into a guarded candidate decision.
+    This function is intentionally decision-only: it never submits orders.
+    """
+    if not DEMO_TRADING:
+        return "WAIT", "Demo mode is not enabled; trading is blocked."
+
+    try:
+        numeric_price = float(price)
+        numeric_usdt = float(usdt_balance)
+        numeric_btc = float(btc_balance)
+        score = int(details.get("indicator_score"))
+    except (TypeError, ValueError, AttributeError):
+        return "WAIT", "Risk inputs are missing or invalid."
+
+    if numeric_price <= 0:
+        return "WAIT", "Price must be positive."
+    if TRADE_AMOUNT_USDT <= 0:
+        return "WAIT", "Configured trade amount must be positive."
+
+    if signal == "BUY":
+        if score < 2:
+            return "WAIT", "BUY signal did not meet the minimum indicator score."
+        if numeric_usdt < TRADE_AMOUNT_USDT:
+            return "WAIT", "Insufficient available USDT for the configured demo trade."
+        return "BUY_CANDIDATE", "Demo-only candidate; order submission remains disabled."
+
+    if signal == "SELL":
+        if score > -2:
+            return "WAIT", "SELL signal did not meet the minimum indicator score."
+        if numeric_btc <= 0:
+            return "WAIT", "No available BTC balance to consider selling."
+        return "SELL_CANDIDATE", "Demo-only candidate; order submission remains disabled."
+
+    return "WAIT", "No qualifying BUY or SELL signal."
+
+
+# ------------------------------------------------------------
 # Demo order
 # ------------------------------------------------------------
 
@@ -379,8 +421,10 @@ def main():
     print("Symbol:", SYMBOL)
     print("Interval:", INTERVAL)
     print("Demo trading header:", DEMO_TRADING)
-    print("ORDER PLACEMENT: DISABLED in this version.")
-    print("This version reports indicators only; it does not send orders.")
+    print("ORDER PLACEMENT: DISABLED — risk engine is decision-only.")
+    print("Demo mode must remain enabled; this version does not send orders.")
+    if TRADE_AMOUNT_USDT <= 0:
+        raise RuntimeError("TRADE_AMOUNT_USDT must be positive.")
     print("=" * 60)
 
     while True:
@@ -404,7 +448,14 @@ def main():
             else:
                 print("Signal detail:", details.get("reason", "Indicators unavailable"))
 
-            print("SAFE MODE: signal recorded; no order was placed.")
+            # Read balances for the risk decision, but never print the values.
+            usdt_balance = get_available_balance("USDT")
+            btc_balance = get_available_balance("BTC")
+            decision, risk_reason = evaluate_risk(
+                signal, live_price, details, usdt_balance, btc_balance
+            )
+            print(f"Risk decision: {decision} — {risk_reason}")
+            print("SAFE MODE: no order was placed.")
             time.sleep(60)
 
         except Exception as error:
