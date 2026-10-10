@@ -97,7 +97,7 @@ def private_request(method, path, params=None):
 
     # Bitget demo trading
     if DEMO_TRADING:
-        headers["paptrading"] = "1"
+        headers["X-SIMULATE-TRADING"] = "1"
 
     response = requests.request(
         method=method.upper(),
@@ -140,13 +140,51 @@ def get_account_assets():
 
 
 def get_available_balance(coin):
-    assets = get_account_assets().get("data", [])
+    response = get_account_assets()
+    assets = response.get("data", [])
+
+    # Be defensive: API/account wrappers can return a list, a single
+    # asset object, or JSON-encoded asset entries.
+    if isinstance(assets, str):
+        try:
+            assets = json.loads(assets)
+        except (TypeError, ValueError):
+            print("Balance check: account data was text, not a parsed asset list.")
+            return 0.0
+
+    if isinstance(assets, dict):
+        # Some account responses wrap assets in a nested list.
+        assets = assets.get("assets", assets.get("list", [assets]))
+
+    if not isinstance(assets, list):
+        print("Balance check: unexpected account asset response; treating balance as zero.")
+        return 0.0
 
     for asset in assets:
-        asset_coin = str(asset.get("coin", "")).upper()
+        if isinstance(asset, str):
+            try:
+                asset = json.loads(asset)
+            except (TypeError, ValueError):
+                # Never guess a balance from an unstructured string.
+                continue
+
+        if not isinstance(asset, dict):
+            continue
+
+        asset_coin = str(
+            asset.get("coin", asset.get("asset", asset.get("currency", "")))
+        ).upper()
+
         if asset_coin == coin.upper():
-            # UTA account assets expose available balance directly.
-            return float(asset.get("available", "0"))
+            available = asset.get(
+                "available",
+                asset.get("availableBalance", asset.get("availableAmount", "0"))
+            )
+            try:
+                return float(available or 0)
+            except (TypeError, ValueError):
+                print(f"Balance check: invalid {coin} available-balance value; treating it as zero.")
+                return 0.0
 
     return 0.0
 
