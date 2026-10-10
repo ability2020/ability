@@ -346,10 +346,21 @@ def evaluate_risk(signal, price, details, usdt_balance, btc_balance):
     except (TypeError, ValueError, AttributeError):
         return "WAIT", "Risk inputs are missing or invalid."
 
+    # Reject NaN/infinity as well as negative values; malformed API data
+    # must never be interpreted as permission to trade.
+    import math
+    if not all(math.isfinite(value) for value in (numeric_price, numeric_usdt, numeric_btc)):
+        return "WAIT", "Risk inputs must be finite numbers."
     if numeric_price <= 0:
         return "WAIT", "Price must be positive."
-    if TRADE_AMOUNT_USDT <= 0:
-        return "WAIT", "Configured trade amount must be positive."
+    if numeric_usdt < 0 or numeric_btc < 0:
+        return "WAIT", "Balances cannot be negative."
+    if not math.isfinite(TRADE_AMOUNT_USDT) or TRADE_AMOUNT_USDT <= 0:
+        return "WAIT", "Configured trade amount must be positive and finite."
+    if not (0 < STOP_LOSS_PERCENT < 100):
+        return "WAIT", "STOP_LOSS_PERCENT must be greater than 0 and less than 100."
+    if not (TAKE_PROFIT_PERCENT > 0 and math.isfinite(TAKE_PROFIT_PERCENT)):
+        return "WAIT", "TAKE_PROFIT_PERCENT must be positive and finite."
 
     if signal == "BUY":
         if score < 2:
@@ -369,6 +380,49 @@ def evaluate_risk(signal, price, details, usdt_balance, btc_balance):
 
 
 # ------------------------------------------------------------
+# Position exit checks (decision-only)
+# ------------------------------------------------------------
+
+def evaluate_position_exit(entry_price, current_price):
+    """
+    Return a decision-only stop-loss/take-profit result for an existing
+    position. This function never places an order and does not persist
+    entry prices between GitHub Actions runs.
+    """
+    try:
+        entry = float(entry_price)
+        current = float(current_price)
+    except (TypeError, ValueError):
+        return "WAIT", "Entry/current price is missing or invalid."
+
+    import math
+    if not math.isfinite(entry) or not math.isfinite(current) or entry <= 0 or current <= 0:
+        return "WAIT", "Entry/current price must be positive finite numbers."
+    if not (0 < STOP_LOSS_PERCENT < 100) or TAKE_PROFIT_PERCENT <= 0:
+        return "WAIT", "Stop-loss/take-profit settings are invalid."
+
+    stop_price = entry * (1 - STOP_LOSS_PERCENT / 100)
+    target_price = entry * (1 + TAKE_PROFIT_PERCENT / 100)
+
+    if current <= stop_price:
+        return "STOP_LOSS_CANDIDATE", "Stop-loss threshold reached; no order submitted."
+    if current >= target_price:
+        return "TAKE_PROFIT_CANDIDATE", "Take-profit threshold reached; no order submitted."
+    return "HOLD", "Position remains between stop-loss and take-profit thresholds."
+
+
+def make_client_order_id(side, time_bucket=None):
+    """
+    Deterministic order ID helper for a time bucket. It supports future
+    duplicate-request protection; order submission remains disabled.
+    """
+    if side not in ("buy", "sell"):
+        raise ValueError("side must be 'buy' or 'sell'")
+    bucket = int(time.time() // 60) if time_bucket is None else int(time_bucket)
+    return f"demo_{side}_{SYMBOL.lower()}_{bucket}"
+
+
+# ------------------------------------------------------------
 # Demo order
 # ------------------------------------------------------------
 
@@ -382,7 +436,7 @@ def place_market_buy(price):
         "side": "buy",
         "orderType": "market",
         "qty": str(TRADE_AMOUNT_USDT),
-        "clientOid": "demo_bot_buy_" + str(int(time.time() * 1000))
+        "clientOid": make_client_order_id("buy")
     }
 
     return private_request(
@@ -400,7 +454,7 @@ def place_market_sell(quantity):
         "side": "sell",
         "orderType": "market",
         "qty": str(quantity),
-        "clientOid": "demo_bot_sell_" + str(int(time.time() * 1000))
+        "clientOid": make_client_order_id("sell")
     }
 
     return private_request(
@@ -421,8 +475,8 @@ def main():
     print("Symbol:", SYMBOL)
     print("Interval:", INTERVAL)
     print("Demo trading header:", DEMO_TRADING)
-    print("ORDER PLACEMENT: DISABLED — risk engine is decision-only.")
-    print("Demo mode must remain enabled; this version does not send orders.")
+    print("ORDER PLACEMENT: DISABLED — safety tests only; no orders can be sent by main().")
+    print("Stop-loss/take-profit checks are decision-only; position entry price is not persisted.")
     if TRADE_AMOUNT_USDT <= 0:
         raise RuntimeError("TRADE_AMOUNT_USDT must be positive.")
     print("=" * 60)
