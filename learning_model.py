@@ -108,6 +108,9 @@ def train_and_evaluate(candles):
     train = labelled.iloc[:split]
     test = labelled.iloc[split:]
 
+    if train["target"].nunique() < 2:
+        raise ValueError("Training window contains only one direction class; model training is unsafe.")
+
     model = make_pipeline(
         StandardScaler(),
         LogisticRegression(max_iter=1000, class_weight="balanced", random_state=42),
@@ -122,7 +125,7 @@ def train_and_evaluate(candles):
     baseline_accuracy = float(np.mean(actual == majority_class))
 
     # Latest candle's next-candle label is unknown; prediction is for the next candle.
-    if latest[FEATURE_COLUMNS].isna().any(axis=None):
+    if latest[FEATURE_COLUMNS].isna().to_numpy().any():
         latest_probability = None
         latest_signal = "WAIT"
         signal_reason = "Latest candle features are incomplete."
