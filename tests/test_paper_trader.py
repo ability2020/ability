@@ -71,6 +71,41 @@ class PaperTradingTests(unittest.TestCase):
         self.assertEqual(event, "HOLD_POSITION")
         self.assertAlmostEqual(state["position"]["entry_price"], 100.0)
 
+    def test_complete_paper_cycle_records_one_closed_trade(self):
+        # Full offline lifecycle: buy, hold, then close on a SELL signal.
+        state, event, _ = paper_trader.process_cycle(
+            paper_trader.default_state(), "BUY", 100.0, 10.0, 2.0, 3.0
+        )
+        self.assertEqual(event, "PAPER_BUY")
+        self.assertIsNotNone(state["position"])
+
+        state, event, _ = paper_trader.process_cycle(
+            state, "WAIT", 102.0, 10.0, 2.0, 3.0
+        )
+        self.assertEqual(event, "HOLD_POSITION")
+        self.assertIsNotNone(state["position"])
+
+        state, event, reason = paper_trader.process_cycle(
+            state, "SELL", 101.0, 10.0, 2.0, 3.0
+        )
+        self.assertEqual(event, "PAPER_SELL")
+        self.assertIn("SELL_SIGNAL", reason)
+        self.assertIsNone(state["position"])
+        self.assertEqual(len(state["closed_trades"]), 1)
+        self.assertAlmostEqual(state["closed_trades"][0]["pnl_usdt"], 0.1)
+        self.assertAlmostEqual(state["realized_pnl_usdt"], 0.1)
+
+    def test_repeated_sell_without_position_never_opens_short(self):
+        state = paper_trader.default_state()
+        for _ in range(2):
+            state, event, _ = paper_trader.process_cycle(
+                state, "SELL", 100.0, 10.0, 2.0, 3.0
+            )
+            self.assertEqual(event, "HOLD_CASH")
+            self.assertIsNone(state["position"])
+        self.assertEqual(state["closed_trades"], [])
+        self.assertEqual(state["realized_pnl_usdt"], 0.0)
+
     def test_state_persists_and_corrupt_state_fails_closed(self):
         state, _, _ = paper_trader.process_cycle(
             paper_trader.default_state(), "BUY", 100.0, 10.0
