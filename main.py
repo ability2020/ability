@@ -535,7 +535,7 @@ def save_position_state(state, path=STATE_FILE):
     try:
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=directory, delete=False) as handle:
             json.dump(clean_state, handle, separators=(",", ":"), sort_keys=True)
-            handle.write("\\n")
+            handle.write("\n")
             temp_path = handle.name
         os.replace(temp_path, path)
     finally:
