@@ -151,8 +151,12 @@ def walk_forward_evaluate(candles):
         "all_test_candles_average_net_return_percent": average_market_return * 100,
         "buy_signals_average_return_beats_all_candles_after_costs": bool(average_buy_return > average_market_return) if average_buy_return is not None else False,
         "buy_only_compounded_return_percent_illustrative_not_portfolio_simulation": net_total_return * 100,
+        # Backward-compatible names used by existing offline safety tests and reports.
+        # These compounded figures remain illustrative, not portfolio-level results.
+        "buy_only_net_total_return_percent_compounded": net_total_return * 100,
         "always_buy_same_period_count": int(len(baseline_returns)),
         "always_buy_compounded_return_percent_illustrative": baseline_total_return * 100,
+        "always_buy_net_total_return_percent_compounded": baseline_total_return * 100,
         "model_buy_strategy_beats_always_buy_after_costs": bool(average_buy_return > average_market_return) if average_buy_return is not None else False,
         "caveats": [
             "Research-only estimate; not proof of future profitability.",
