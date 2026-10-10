@@ -1,3 +1,4 @@
+import argparse
 import os
 import time
 import json
@@ -468,7 +469,7 @@ def place_market_sell(quantity):
 # Main loop: signal-only safety mode
 # ------------------------------------------------------------
 
-def main():
+def main(run_once=False):
     print("=" * 60)
     print("BITGET UTA V3 SPOT BOT — SIGNAL-ONLY MODE")
     print("=" * 60)
@@ -510,12 +511,23 @@ def main():
             )
             print(f"Risk decision: {decision} — {risk_reason}")
             print("SAFE MODE: no order was placed.")
+            if run_once:
+                return
             time.sleep(60)
 
         except Exception as error:
             print("ERROR:", error)
+            if run_once:
+                raise
             time.sleep(30)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Bitget Spot demo bot (signal-only safe mode).")
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Run one market/indicator/risk check and exit; never submits orders."
+    )
+    args = parser.parse_args()
+    main(run_once=args.once)
