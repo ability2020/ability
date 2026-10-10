@@ -53,6 +53,7 @@ jobs:
         run: |
           python - <<'PY'
           import json
+          import time
           import main
 
           print("Testing public market data...")
@@ -102,7 +103,29 @@ jobs:
           if decision != "WAIT":
               raise SystemExit("Risk engine failed to block SELL without BTC.")
 
-          print("Risk engine tests: PASSED")
+          decision, reason = main.evaluate_risk("BUY", float("nan"), buy_details, 20.0, 0.0)
+          if decision != "WAIT":
+              raise SystemExit("Risk engine failed to block non-finite prices.")
+
+          print("Testing decision-only stop-loss/take-profit checks...")
+          decision, _ = main.evaluate_position_exit(100.0, 97.0)
+          if decision != "STOP_LOSS_CANDIDATE":
+              raise SystemExit("Stop-loss threshold test failed.")
+          decision, _ = main.evaluate_position_exit(100.0, 104.0)
+          if decision != "TAKE_PROFIT_CANDIDATE":
+              raise SystemExit("Take-profit threshold test failed.")
+          decision, _ = main.evaluate_position_exit(100.0, 101.0)
+          if decision != "HOLD":
+              raise SystemExit("Hold-range test failed.")
+
+          first_id = main.make_client_order_id("buy", time_bucket=12345)
+          second_id = main.make_client_order_id("buy", time_bucket=12345)
+          if first_id != second_id:
+              raise SystemExit("Deterministic duplicate-order ID test failed.")
+          if first_id == main.make_client_order_id("sell", time_bucket=12345):
+              raise SystemExit("BUY and SELL client order IDs must differ.")
+
+          print("Risk, stop-loss, take-profit and order-ID tests: PASSED")
           print("Bitget connection, balance, indicator and risk tests: PASSED")
           print("No order was placed by this test.")
           PY
