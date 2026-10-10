@@ -30,6 +30,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Run offline safety unit tests
+        run: python -m unittest discover -s tests -v
+
       - name: Check Bitget credentials
         run: |
           python - <<'PY'
