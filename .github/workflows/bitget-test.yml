@@ -36,6 +36,9 @@ jobs:
       - name: Run offline safety unit tests
         run: python -m unittest discover -s tests -v
 
+      - name: Train and evaluate experimental learning model (no orders)
+        run: python learning_model.py
+
       - name: Check Bitget credentials
         run: |
           python - <<'PY'
@@ -264,6 +267,11 @@ jobs:
                   latest_signal = json.load(file)
           except (OSError, json.JSONDecodeError):
               latest_signal = None
+          try:
+              with open("ml_report.json", "r", encoding="utf-8") as file:
+                  learning_report = json.load(file)
+          except (OSError, json.JSONDecodeError):
+              learning_report = None
 
           report = {
               "report_type": "paper-trading-only-with-market-signal",
@@ -273,6 +281,7 @@ jobs:
               "symbol": os.getenv("BITGET_SYMBOL", "BTCUSDT"),
               "interval": os.getenv("BITGET_INTERVAL", "5m"),
               "latest_market_signal": latest_signal,
+              "experimental_learning_model": learning_report,
               "realized_pnl_usdt_gross": state["realized_pnl_usdt"],
               "closed_trade_count": len(state["closed_trades"]),
               "open_position": state["position"],
@@ -333,5 +342,6 @@ jobs:
           path: |
             paper_report.json
             paper_signal.json
+            ml_report.json
           if-no-files-found: warn
           retention-days: 30
