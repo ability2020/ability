@@ -1,9 +1,8 @@
 """Chronological walk-forward evaluation of the experimental model.
 
-This is a research report, not a trading bot. It only downloads public candles,
-never reads account data, and never submits exchange orders. Each BUY prediction
-is evaluated as a separate one-candle hypothetical Spot trade after estimated
-fees and slippage; it is not a portfolio-level execution simulator.
+Research only: public candles, no account access, and no exchange orders.
+Returns are reported as fixed-stake PnL and average per-trade return. Compounded
+returns are illustrative only because stake size and idle cash are not simulated.
 """
 import json
 import os
