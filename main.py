@@ -466,6 +466,84 @@ def place_market_sell(quantity):
 
 
 # ------------------------------------------------------------
+# Persistent position state (no orders are placed by this version)
+# ------------------------------------------------------------
+
+STATE_FILE = os.getenv("BOT_STATE_FILE", "bot_state.json")
+
+
+def load_position_state(path=STATE_FILE):
+    """Load validated local state; absent state means no tracked position."""
+    default_state = {"version": 1, "position": None, "last_order_ids": []}
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            state = json.load(handle)
+    except FileNotFoundError:
+        return default_state
+    except (OSError, json.JSONDecodeError) as error:
+        raise RuntimeError(f"Could not read bot state safely: {error}") from error
+
+    if not isinstance(state, dict) or state.get("version") != 1:
+        raise RuntimeError("Bot state is invalid or uses an unsupported version.")
+    position = state.get("position")
+    if position is not None:
+        if not isinstance(position, dict):
+            raise RuntimeError("Bot position state is invalid.")
+        try:
+            entry_price = float(position["entry_price"])
+            quantity = float(position["quantity"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise RuntimeError("Bot position state has invalid price/quantity.") from error
+        import math
+        if not math.isfinite(entry_price) or not math.isfinite(quantity) or entry_price <= 0 or quantity <= 0:
+            raise RuntimeError("Bot position state price/quantity must be positive finite values.")
+    order_ids = state.get("last_order_ids", [])
+    if not isinstance(order_ids, list) or any(not isinstance(item, str) for item in order_ids):
+        raise RuntimeError("Bot order-ID state is invalid.")
+    return {"version": 1, "position": position, "last_order_ids": order_ids[-100:]}
+
+
+def save_position_state(state, path=STATE_FILE):
+    """Atomically save validated state without logging secrets or balances."""
+    if not isinstance(state, dict) or state.get("version") != 1:
+        raise ValueError("Refusing to save invalid bot state.")
+    # Reuse the same validation rules before writing.
+    position = state.get("position")
+    if position is not None:
+        if not isinstance(position, dict):
+            raise ValueError("Position state must be an object or null.")
+        try:
+            entry_price = float(position["entry_price"])
+            quantity = float(position["quantity"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError("Position state needs numeric entry_price and quantity.") from error
+        import math
+        if not math.isfinite(entry_price) or not math.isfinite(quantity) or entry_price <= 0 or quantity <= 0:
+            raise ValueError("Position state price/quantity must be positive finite values.")
+    order_ids = state.get("last_order_ids", [])
+    if not isinstance(order_ids, list) or any(not isinstance(item, str) for item in order_ids):
+        raise ValueError("Order IDs must be a list of strings.")
+    clean_state = {
+        "version": 1,
+        "position": position,
+        "last_order_ids": order_ids[-100:],
+    }
+    import tempfile
+    directory = os.path.dirname(os.path.abspath(path))
+    os.makedirs(directory, exist_ok=True)
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=directory, delete=False) as handle:
+            json.dump(clean_state, handle, separators=(",", ":"), sort_keys=True)
+            handle.write("\\n")
+            temp_path = handle.name
+        os.replace(temp_path, path)
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+
+# ------------------------------------------------------------
 # Main loop: signal-only safety mode
 # ------------------------------------------------------------
 
@@ -477,7 +555,10 @@ def main(run_once=False):
     print("Interval:", INTERVAL)
     print("Demo trading header:", DEMO_TRADING)
     print("ORDER PLACEMENT: DISABLED — safety tests only; no orders can be sent by main().")
-    print("Stop-loss/take-profit checks are decision-only; position entry price is not persisted.")
+    print("Stop-loss/take-profit checks are decision-only; orders remain disabled.")
+    state = load_position_state()
+    print("Position state:", "tracked position present" if state["position"] else "no tracked position")
+    save_position_state(state)
     if TRADE_AMOUNT_USDT <= 0:
         raise RuntimeError("TRADE_AMOUNT_USDT must be positive.")
     print("=" * 60)
