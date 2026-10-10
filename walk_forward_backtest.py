@@ -68,6 +68,7 @@ def walk_forward_evaluate(candles):
     baseline_returns = []
     directional_actual = []
     directional_predictions = []
+    majority_baseline_predictions = []
     buy_count = 0
     sell_count = 0
     wait_count = 0
@@ -89,6 +90,8 @@ def walk_forward_evaluate(candles):
         predicted_up = int(probability_up >= 0.5)
         directional_actual.append(actual_up)
         directional_predictions.append(predicted_up)
+        # Compare each prediction with a baseline learned only from that fold's training data.
+        majority_baseline_predictions.append(int(train["target"].mean() >= 0.5))
 
         if probability_up >= BUY_THRESHOLD:
             signal = "BUY"
@@ -136,6 +139,8 @@ def walk_forward_evaluate(candles):
         "last_test_timestamp": predictions[-1]["timestamp"],
         "directional_accuracy": float(accuracy_score(directional_actual, directional_predictions)),
         "directional_balanced_accuracy": float(balanced_accuracy_score(directional_actual, directional_predictions)),
+        "walk_forward_majority_baseline_accuracy": float(accuracy_score(directional_actual, majority_baseline_predictions)),
+        "directional_accuracy_beats_majority_baseline": bool(accuracy_score(directional_actual, directional_predictions) > accuracy_score(directional_actual, majority_baseline_predictions)),
         "buy_signal_count": buy_count,
         "sell_signal_count": sell_count,
         "wait_signal_count": wait_count,
@@ -180,6 +185,8 @@ def main():
     print("Predictions:", result["walk_forward_prediction_count"])
     print("Directional accuracy:", round(result["directional_accuracy"], 4))
     print("Balanced accuracy:", round(result["directional_balanced_accuracy"], 4))
+    print("Walk-forward majority baseline accuracy:", round(result["walk_forward_majority_baseline_accuracy"], 4))
+    print("Beats walk-forward majority baseline:", result["directional_accuracy_beats_majority_baseline"])
     print("BUY / SELL / WAIT:", result["buy_signal_count"], "/", result["sell_signal_count"], "/", result["wait_signal_count"])
     print("BUY-only fixed-stake total PnL (USDT):", round(result["buy_only_fixed_stake_total_pnl_usdt"], 4))
     print("BUY-only average net return per trade (%):", result["buy_only_average_net_return_percent_per_trade"])
