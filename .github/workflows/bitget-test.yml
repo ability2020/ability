@@ -2,6 +2,8 @@ name: Bitget Demo Bot Test
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
   schedule:
     # Run paper-only market monitoring every 15 minutes (UTC).
     - cron: "*/15 * * * *"
