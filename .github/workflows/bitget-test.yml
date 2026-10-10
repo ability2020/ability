@@ -41,6 +41,9 @@ jobs:
       - name: Train and evaluate experimental learning model (no orders)
         run: python learning_model.py
 
+      - name: Walk-forward backtest with estimated fees and slippage (no orders)
+        run: python walk_forward_backtest.py
+
       - name: Check Bitget credentials
         run: |
           python - <<'PY'
@@ -274,6 +277,11 @@ jobs:
                   learning_report = json.load(file)
           except (OSError, json.JSONDecodeError):
               learning_report = None
+          try:
+              with open("walk_forward_report.json", "r", encoding="utf-8") as file:
+                  walk_forward_report = json.load(file)
+          except (OSError, json.JSONDecodeError):
+              walk_forward_report = None
 
           report = {
               "report_type": "paper-trading-only-with-market-signal",
@@ -284,6 +292,7 @@ jobs:
               "interval": os.getenv("BITGET_INTERVAL", "5m"),
               "latest_market_signal": latest_signal,
               "experimental_learning_model": learning_report,
+              "walk_forward_evaluation": walk_forward_report,
               "realized_pnl_usdt_gross": state["realized_pnl_usdt"],
               "closed_trade_count": len(state["closed_trades"]),
               "open_position": state["position"],
@@ -345,5 +354,6 @@ jobs:
             paper_report.json
             paper_signal.json
             ml_report.json
+            walk_forward_report.json
           if-no-files-found: warn
           retention-days: 30
