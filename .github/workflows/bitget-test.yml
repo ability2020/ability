@@ -107,6 +107,34 @@ jobs:
           if decision != "WAIT":
               raise SystemExit("Risk engine failed to block non-finite prices.")
 
+          print("Testing persistent state validation...")
+          import tempfile
+          from pathlib import Path
+          with tempfile.TemporaryDirectory() as temp_dir:
+              state_path = str(Path(temp_dir) / "state.json")
+              initial_state = main.load_position_state(state_path)
+              if initial_state["position"] is not None:
+                  raise SystemExit("Fresh state should have no tracked position.")
+              test_state = {
+                  "version": 1,
+                  "position": {"entry_price": 100.0, "quantity": 0.01},
+                  "last_order_ids": ["demo_test_order"],
+              }
+              main.save_position_state(test_state, state_path)
+              if main.load_position_state(state_path) != test_state:
+                  raise SystemExit("Position state round-trip test failed.")
+              try:
+                  main.save_position_state({
+                      "version": 1,
+                      "position": {"entry_price": float("nan"), "quantity": 0.01},
+                      "last_order_ids": [],
+                  }, state_path)
+              except ValueError:
+                  pass
+              else:
+                  raise SystemExit("State validation failed to reject a non-finite entry price.")
+          print("Persistent state validation: PASSED")
+
           print("Testing decision-only stop-loss/take-profit checks...")
           decision, _ = main.evaluate_position_exit(100.0, 97.0)
           if decision != "STOP_LOSS_CANDIDATE":
@@ -130,5 +158,20 @@ jobs:
           print("No order was placed by this test.")
           PY
 
+      - name: Restore bot position state
+        uses: actions/cache/restore@v4
+        with:
+          path: bot_state.json
+          key: bitget-bot-state-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            bitget-bot-state-${{ github.ref_name }}-
+
       - name: Run bot signal check (one cycle, no orders)
         run: python main.py --once
+
+      - name: Save bot position state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: bot_state.json
+          key: bitget-bot-state-${{ github.ref_name }}-${{ github.run_id }}
