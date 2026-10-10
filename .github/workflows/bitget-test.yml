@@ -164,7 +164,9 @@ jobs:
       - name: Restore bot position state
         uses: actions/cache/restore@v4
         with:
-          path: bot_state.json
+          path: |
+            bot_state.json
+            paper_state.json
           key: bitget-bot-state-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
             bitget-bot-state-${{ github.ref_name }}-
@@ -172,9 +174,39 @@ jobs:
       - name: Run bot signal check (one cycle, no orders)
         run: python main.py --once
 
+      - name: Run paper-trading simulation (no exchange orders)
+        run: |
+          python - <<'PY'
+          import main
+          import paper_trader
+
+          signal, _, details = main.get_signal()
+          ticker = main.get_ticker()
+          price = float(ticker["lastPrice"])
+          state = paper_trader.load_state()
+          updated, event, reason = paper_trader.process_cycle(
+              state,
+              signal,
+              price,
+              trade_amount_usdt=main.TRADE_AMOUNT_USDT,
+              stop_loss_percent=main.STOP_LOSS_PERCENT,
+              take_profit_percent=main.TAKE_PROFIT_PERCENT,
+          )
+          paper_trader.save_state(updated)
+          print("PAPER-TRADING ONLY — no Bitget order endpoint called.")
+          print("Signal:", signal)
+          print("Paper event:", event)
+          print("Reason:", reason)
+          print("Simulated realized PnL (USDT):", round(updated["realized_pnl_usdt"], 6))
+          print("Simulated position open:", updated["position"] is not None)
+          print("Closed simulated trades recorded:", len(updated["closed_trades"]))
+          PY
+
       - name: Save bot position state
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: bot_state.json
+          path: |
+            bot_state.json
+            paper_state.json
           key: bitget-bot-state-${{ github.ref_name }}-${{ github.run_id }}
