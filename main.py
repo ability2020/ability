@@ -247,42 +247,83 @@ def get_ticker():
 
 
 # ------------------------------------------------------------
-# Simple trend calculation
+# Indicator scoring (signal-only)
 # ------------------------------------------------------------
 
 def calculate_sma(values, period):
     if len(values) < period:
         return None
-
     return sum(values[-period:]) / period
+
+
+def calculate_rsi(values, period=14):
+    if len(values) <= period:
+        return None
+
+    changes = [values[i] - values[i - 1] for i in range(1, len(values))]
+    recent = changes[-period:]
+    gains = [change if change > 0 else 0.0 for change in recent]
+    losses = [-change if change < 0 else 0.0 for change in recent]
+    average_gain = sum(gains) / period
+    average_loss = sum(losses) / period
+
+    if average_loss == 0:
+        return 100.0 if average_gain > 0 else 50.0
+
+    relative_strength = average_gain / average_loss
+    return 100.0 - (100.0 / (1.0 + relative_strength))
 
 
 def get_signal():
     candles = get_candles()
 
-    # Bitget candle format:
-    # [timestamp, open, high, low, close, volume, turnover]
+    # Bitget candle format: [timestamp, open, high, low, close, volume, turnover]
+    if not isinstance(candles, list) or len(candles) < 22:
+        return "WAIT", None, {"reason": "Not enough candle data"}
 
-    closes = [
-        float(candle[4])
-        for candle in candles
-    ]
+    try:
+        closes = [float(candle[4]) for candle in candles if len(candle) > 4]
+    except (TypeError, ValueError, IndexError):
+        return "WAIT", None, {"reason": "Invalid candle data"}
 
-    if len(closes) < 21:
-        return "WAIT", None
+    if len(closes) < 22:
+        return "WAIT", None, {"reason": "Not enough valid closing prices"}
+
+    # Bitget candle endpoints commonly return newest first; sort by timestamp
+    # when timestamps are available so indicators use chronological closes.
+    try:
+        ordered = sorted(candles, key=lambda candle: int(candle[0]))
+        closes = [float(candle[4]) for candle in ordered]
+    except (TypeError, ValueError, IndexError):
+        pass
 
     fast_sma = calculate_sma(closes, 9)
     slow_sma = calculate_sma(closes, 21)
-
+    rsi = calculate_rsi(closes, 14)
     current_price = closes[-1]
 
-    if fast_sma > slow_sma:
-        return "BUY", current_price
+    if fast_sma is None or slow_sma is None or rsi is None:
+        return "WAIT", current_price, {"reason": "Indicators unavailable"}
 
-    if fast_sma < slow_sma:
-        return "SELL", current_price
+    score = 0
+    score += 1 if fast_sma > slow_sma else (-1 if fast_sma < slow_sma else 0)
+    score += 1 if 50 <= rsi < 70 else (-1 if 30 < rsi <= 50 else 0)
 
-    return "WAIT", current_price
+    if score >= 2:
+        signal = "BUY"
+    elif score <= -2:
+        signal = "SELL"
+    else:
+        signal = "WAIT"
+
+    details = {
+        "fast_sma": fast_sma,
+        "slow_sma": slow_sma,
+        "rsi_14": rsi,
+        "indicator_score": score,
+        "reason": "Signal only; no orders are sent by this version",
+    }
+    return signal, current_price, details
 
 
 # ------------------------------------------------------------
@@ -328,89 +369,42 @@ def place_market_sell(quantity):
 
 
 # ------------------------------------------------------------
-# Main loop
+# Main loop: signal-only safety mode
 # ------------------------------------------------------------
 
 def main():
     print("=" * 60)
-    print("BITGET UTA V3 SPOT DEMO BOT")
+    print("BITGET UTA V3 SPOT BOT — SIGNAL-ONLY MODE")
     print("=" * 60)
     print("Symbol:", SYMBOL)
     print("Interval:", INTERVAL)
-    print("Demo trading:", DEMO_TRADING)
-    print("Trade amount:", TRADE_AMOUNT_USDT, "USDT")
+    print("Demo trading header:", DEMO_TRADING)
+    print("ORDER PLACEMENT: DISABLED in this version.")
+    print("This version reports indicators only; it does not send orders.")
     print("=" * 60)
-
-    if DEMO_TRADING:
-        print("SAFE MODE: Bitget demo trading is enabled.")
-
-    last_signal = None
 
     while True:
         try:
-            signal, price = get_signal()
+            signal, price, details = get_signal()
             ticker = get_ticker()
-
-            # UTA v3 ticker field is lastPrice.
             last_price = ticker.get("lastPrice")
             if last_price is None:
                 raise RuntimeError("Ticker response did not contain lastPrice.")
-
             live_price = float(last_price)
 
-            now = datetime.now(timezone.utc).strftime(
-                "%Y-%m-%d %H:%M:%S UTC"
-            )
+            now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            print(f"[{now}] {SYMBOL} price={live_price:.2f} signal={signal}")
+            if "indicator_score" in details:
+                print(
+                    f"SMA9={details['fast_sma']:.4f} "
+                    f"SMA21={details['slow_sma']:.4f} "
+                    f"RSI14={details['rsi_14']:.2f} "
+                    f"score={details['indicator_score']}"
+                )
+            else:
+                print("Signal detail:", details.get("reason", "Indicators unavailable"))
 
-            print(
-                f"[{now}] "
-                f"{SYMBOL} price={live_price:.2f} "
-                f"signal={signal}"
-            )
-
-            # ------------------------------------------------
-            # IMPORTANT:
-            # We only place a demo BUY when the signal changes
-            # to BUY. This prevents repeated orders every loop.
-            # ------------------------------------------------
-
-            if signal == "BUY" and last_signal != "BUY":
-                print("BUY signal detected.")
-
-                usdt_available = get_available_balance("USDT")
-                print(f"Available USDT: {usdt_available:.8f}")
-
-                if usdt_available < TRADE_AMOUNT_USDT:
-                    print(
-                        "BUY blocked: insufficient available USDT "
-                        f"(need {TRADE_AMOUNT_USDT:.2f})."
-                    )
-                elif DEMO_TRADING:
-                    result = place_market_buy(live_price)
-                    print("DEMO BUY RESPONSE:")
-                    print(json.dumps(result, indent=2))
-                else:
-                    print("LIVE trading disabled.")
-
-            elif signal == "SELL":
-                print("SELL signal detected.")
-
-                btc_available = get_available_balance("BTC")
-                print(f"Available BTC: {btc_available:.8f}")
-
-                # Automatic SELL remains disabled until the
-                # position/risk logic is implemented and tested.
-                if btc_available <= 0:
-                    print("SELL blocked: no available BTC balance.")
-                else:
-                    print(
-                        "Automatic SELL is still disabled; "
-                        "BTC balance check passed."
-                    )
-
-            last_signal = signal
-
-            # Check approximately once per minute.
+            print("SAFE MODE: signal recorded; no order was placed.")
             time.sleep(60)
 
         except Exception as error:
