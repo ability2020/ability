@@ -118,6 +118,11 @@ def walk_forward_evaluate(candles):
     if len(predictions) < 20:
         raise ValueError("Walk-forward test produced fewer than 20 predictions.")
 
+    # Fixed-stake PnL makes the assumed exposure explicit. Compounded returns
+    # below are illustrative and are not a portfolio-level simulation.
+    fixed_stake_pnl_usdt = float(sum(trade_returns) * STAKE_USDT)
+    average_buy_return = float(np.mean(trade_returns)) if trade_returns else None
+    average_market_return = float(np.mean(baseline_returns))
     net_total_return = float(np.prod([1.0 + r for r in trade_returns]) - 1.0) if trade_returns else 0.0
     baseline_total_return = float(np.prod([1.0 + r for r in baseline_returns]) - 1.0)
     return {
@@ -134,20 +139,26 @@ def walk_forward_evaluate(candles):
         "buy_signal_count": buy_count,
         "sell_signal_count": sell_count,
         "wait_signal_count": wait_count,
-        "trade_test_method": "Each BUY prediction is a separate hypothetical one-candle long trade, entered at that candle close and exited at the next close; no overlapping capital constraint is modelled.",
+        "trade_test_method": "Each BUY prediction is a hypothetical one-candle Spot long, entered at that candle close and exited at the next close. Each trade uses a fixed stake; actual portfolio allocation, idle cash, and order execution are not simulated.",
         "stake_per_hypothetical_trade_usdt": STAKE_USDT,
         "fee_rate_each_side": FEE_RATE,
         "slippage_rate_each_side": SLIPPAGE_RATE,
         "estimated_round_trip_cost_percent_approx": float((2 * FEE_RATE + 2 * SLIPPAGE_RATE) * 100),
         "buy_only_trade_count": int(len(trade_returns)),
-        "buy_only_net_total_return_percent_compounded": net_total_return * 100,
-        "buy_only_average_net_return_percent_per_trade": float(np.mean(trade_returns) * 100) if trade_returns else None,
+        "buy_only_fixed_stake_total_pnl_usdt": fixed_stake_pnl_usdt,
+        "buy_only_return_on_total_deployed_stake_percent": average_buy_return * 100 if average_buy_return is not None else None,
+        "buy_only_average_net_return_percent_per_trade": average_buy_return * 100 if average_buy_return is not None else None,
+        "all_test_candles_average_net_return_percent": average_market_return * 100,
+        "buy_signals_average_return_beats_all_candles_after_costs": bool(average_buy_return > average_market_return) if average_buy_return is not None else False,
+        "buy_only_compounded_return_percent_illustrative_not_portfolio_simulation": net_total_return * 100,
         "always_buy_same_period_count": int(len(baseline_returns)),
-        "always_buy_net_total_return_percent_compounded": baseline_total_return * 100,
-        "model_buy_strategy_beats_always_buy_after_costs": bool(net_total_return > baseline_total_return) if trade_returns else False,
+        "always_buy_compounded_return_percent_illustrative": baseline_total_return * 100,
+        "model_buy_strategy_beats_always_buy_after_costs": bool(average_buy_return > average_market_return) if average_buy_return is not None else False,
         "caveats": [
             "Research-only estimate; not proof of future profitability.",
-            "Each BUY signal is evaluated as an independent one-candle trade; capital overlap, order-book depth, spread variation, partial fills, and taxes are not modelled.",
+            "Fixed-stake PnL assumes the stated stake is deployed for every BUY signal; it does not model a real account balance or position sizing.",
+            "Compounded returns are illustrative only and are not a portfolio-level backtest; they should not be treated as expected account returns.",
+            "Order-book depth, spread variation, partial fills, idle cash, and taxes are not modelled.",
             "Fee and slippage assumptions may differ from actual Bitget account costs.",
             "SELL predictions are reported but this Spot test does not short-sell.",
             "No exchange account is accessed and no orders are submitted.",
@@ -166,8 +177,10 @@ def main():
     print("Directional accuracy:", round(result["directional_accuracy"], 4))
     print("Balanced accuracy:", round(result["directional_balanced_accuracy"], 4))
     print("BUY / SELL / WAIT:", result["buy_signal_count"], "/", result["sell_signal_count"], "/", result["wait_signal_count"])
-    print("BUY-only net compounded return after assumed costs (%):", round(result["buy_only_net_total_return_percent_compounded"], 4))
-    print("Always-buy benchmark after assumed costs (%):", round(result["always_buy_net_total_return_percent_compounded"], 4))
+    print("BUY-only fixed-stake total PnL (USDT):", round(result["buy_only_fixed_stake_total_pnl_usdt"], 4))
+    print("BUY-only average net return per trade (%):", result["buy_only_average_net_return_percent_per_trade"])
+    print("All-candle average net return (%):", round(result["all_test_candles_average_net_return_percent"], 4))
+    print("Compounded figures are illustrative only, not portfolio returns.")
     print("Report written: walk_forward_report.json")
     print("This research report does not control paper trades or place orders.")
 
