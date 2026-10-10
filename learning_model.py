@@ -20,7 +20,7 @@ from sklearn.preprocessing import StandardScaler
 BASE_URL = "https://api.bitget.com"
 SYMBOL = os.getenv("BITGET_SYMBOL", "BTCUSDT")
 INTERVAL = os.getenv("BITGET_INTERVAL", "5m")
-CANDLE_LIMIT = 500
+CANDLE_LIMIT = 1000  # Larger historical sample for more informative research tests
 MIN_SAMPLES = 120
 MODEL_VERSION = "logistic-direction-v1"
 
