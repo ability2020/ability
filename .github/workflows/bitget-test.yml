@@ -202,6 +202,35 @@ jobs:
           print("Closed simulated trades recorded:", len(updated["closed_trades"]))
           PY
 
+      - name: Demonstrate a synthetic paper trade (offline only)
+        run: |
+          python - <<'PY'
+          import paper_trader
+
+          state = paper_trader.default_state()
+          state, buy_event, _ = paper_trader.process_cycle(
+              state, "BUY", 100.0, trade_amount_usdt=10.0,
+              stop_loss_percent=2.0, take_profit_percent=3.0,
+          )
+          state, sell_event, reason = paper_trader.process_cycle(
+              state, "WAIT", 103.0, trade_amount_usdt=10.0,
+              stop_loss_percent=2.0, take_profit_percent=3.0,
+          )
+          trade = state["closed_trades"][-1]
+          print("SYNTHETIC EXAMPLE ONLY — these are not live prices or a real trade.")
+          print("Hypothetical entry event:", buy_event)
+          print("Hypothetical exit event:", sell_event)
+          print("Exit reason:", reason)
+          print("Example gross PnL before fees/slippage (USDT):", round(trade["pnl_usdt"], 6))
+          print("Example realized PnL total (USDT):", round(state["realized_pnl_usdt"], 6))
+          print("Closed example trades:", len(state["closed_trades"]))
+          print("Open example position:", state["position"] is not None)
+          if buy_event != "PAPER_BUY" or sell_event != "PAPER_SELL":
+              raise SystemExit("Synthetic paper-trade lifecycle did not complete.")
+          if trade["exit_reason"] != "TAKE_PROFIT" or abs(trade["pnl_usdt"] - 0.3) > 1e-9:
+              raise SystemExit("Synthetic paper-trade results did not match expectations.")
+          PY
+
       - name: Save bot position state
         if: always()
         uses: actions/cache/save@v4
