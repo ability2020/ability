@@ -30,6 +30,8 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertGreater(report["first_test_timestamp"], 0)
         self.assertIn("fee_rate_each_side", report)
         self.assertIn("slippage_rate_each_side", report)
+        self.assertIn("walk_forward_majority_baseline_accuracy", report)
+        self.assertIn("directional_accuracy_beats_majority_baseline", report)
         self.assertIn("buy_only_net_total_return_percent_compounded", report)
         self.assertIn("always_buy_net_total_return_percent_compounded", report)
         self.assertLessEqual(
