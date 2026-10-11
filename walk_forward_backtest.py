@@ -100,6 +100,32 @@ def _select_buy_threshold(train, usable):
     return float(best_threshold)
 
 
+def evaluate_research_gate(prediction_count, buy_count, average_buy_return, average_market_return, fixed_stake_pnl):
+    """Report-only gate; never authorizes exchange orders or live trading."""
+    checks = {
+        "enough_walk_forward_predictions": int(prediction_count) >= 500,
+        "enough_buy_signals": int(buy_count) >= 30,
+        "positive_average_net_buy_return": average_buy_return is not None and float(average_buy_return) > 0.0,
+        "buy_returns_beat_all_candles_after_costs": (
+            average_buy_return is not None
+            and average_market_return is not None
+            and float(average_buy_return) > float(average_market_return)
+        ),
+        "positive_fixed_stake_pnl": float(fixed_stake_pnl) > 0.0,
+    }
+    return {
+        "single_period_research_gate_passed": bool(all(checks.values())),
+        "single_period_research_gate_checks": checks,
+        "real_money_trading_eligible": False,
+        "gate_note": (
+            "This report-only gate is not connected to order placement. "
+            "Real-money use remains disabled and would require positive after-cost "
+            "results across multiple distinct unseen periods, realistic execution "
+            "assumptions, and independent review."
+        ),
+    }
+
+
 def walk_forward_evaluate(candles):
     _validate_settings()
     frame = build_feature_frame(candles)
@@ -186,6 +212,10 @@ def walk_forward_evaluate(candles):
     tuned_average_buy_return = float(np.mean(tuned_trade_returns)) if tuned_trade_returns else None
     average_buy_return = float(np.mean(trade_returns)) if trade_returns else None
     average_market_return = float(np.mean(baseline_returns))
+    research_gate = evaluate_research_gate(
+        len(predictions), len(trade_returns), average_buy_return,
+        average_market_return, fixed_stake_pnl_usdt,
+    )
     net_total_return = float(np.prod([1.0 + r for r in trade_returns]) - 1.0) if trade_returns else 0.0
     baseline_total_return = float(np.prod([1.0 + r for r in baseline_returns]) - 1.0)
     return {
@@ -202,6 +232,7 @@ def walk_forward_evaluate(candles):
         "walk_forward_majority_baseline_accuracy": float(accuracy_score(directional_actual, majority_baseline_predictions)),
         "directional_accuracy_beats_majority_baseline": bool(accuracy_score(directional_actual, directional_predictions) > accuracy_score(directional_actual, majority_baseline_predictions)),
         "buy_signal_count": buy_count,
+        **research_gate,
         "threshold_tuning_method": "At each walk-forward step, compare fixed candidate BUY thresholds on an inner chronological validation slice from that step's training data only; use the selected threshold only for that step only if its average estimated net return is positive. If validation is too small, has fewer than five candidate trades, or no candidate has positive average net return after estimated costs, fall back to ML_BUY_THRESHOLD. This is exploratory and can overfit the inner validation slice.",
         "configured_buy_threshold": BUY_THRESHOLD,
         "selected_buy_threshold_min": float(min(selected_thresholds)),
