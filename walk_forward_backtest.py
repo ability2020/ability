@@ -206,6 +206,8 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
 
     total_pnl = float(sum(trade["pnl_usdt"] for trade in trades))
     return {
+        # Explicitly research-only: this simulation can never approve real-money trading.
+        "real_money_trading_eligible": False,
         "position_strategy_stop_loss_percent": float(stop_loss_percent),
         "position_strategy_take_profit_percent": float(take_profit_percent),
         "position_strategy_trade_count": len(trades),
