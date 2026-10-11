@@ -386,11 +386,104 @@ def walk_forward_evaluate(candles):
     }
 
 
+
+def evaluate_multiple_unseen_periods(candles, period_count=3):
+    """Evaluate disjoint chronological periods separately; research only, never authorizes orders."""
+    if not isinstance(period_count, int) or period_count < 2:
+        raise ValueError("period_count must be an integer of at least 2.")
+
+    frame = build_feature_frame(candles)
+    valid = frame.dropna(subset=["timestamp", "open", "high", "low", "close", "volume"])
+    valid = valid.sort_values("timestamp").reset_index(drop=True)
+    minimum_period_candles = MIN_SAMPLES + 30
+    if len(valid) < period_count * minimum_period_candles:
+        return {
+            "report_type": "experimental-multi-period-walk-forward-evaluation",
+            "multi_period_evaluation_available": False,
+            "period_count_requested": period_count,
+            "available_candle_count": int(len(valid)),
+            "minimum_candles_required": int(period_count * minimum_period_candles),
+            "reason": "Not enough candles to evaluate every disjoint period with a training window and test predictions.",
+            "real_money_trading_eligible": False,
+        }
+
+    # Rebuild clean OHLCV rows, then split into non-overlapping chronological periods.
+    ordered_candles = [
+        [
+            str(int(row["timestamp"])), str(float(row["open"])),
+            str(float(row["high"])), str(float(row["low"])),
+            str(float(row["close"])), str(float(row["volume"])), "0",
+        ]
+        for _, row in valid.iterrows()
+    ]
+    boundaries = np.linspace(0, len(ordered_candles), period_count + 1, dtype=int)
+    period_reports = []
+    for period_index in range(period_count):
+        period_candles = ordered_candles[boundaries[period_index]:boundaries[period_index + 1]]
+        report = walk_forward_evaluate(period_candles)
+        average_buy = report["buy_only_average_net_return_percent_per_trade"]
+        average_market = report["all_test_candles_average_net_return_percent"]
+        checks = {
+            "enough_walk_forward_predictions": report["walk_forward_prediction_count"] >= 50,
+            "enough_buy_signals": report["buy_signal_count"] >= 5,
+            "positive_average_net_buy_return": average_buy is not None and average_buy > 0.0,
+            "buy_returns_beat_all_candles_after_costs": (
+                average_buy is not None and average_market is not None and average_buy > average_market
+            ),
+            "positive_fixed_stake_pnl": report["buy_only_fixed_stake_total_pnl_usdt"] > 0.0,
+        }
+        period_reports.append({
+            "period_number": period_index + 1,
+            "first_candle_timestamp": int(period_candles[0][0]),
+            "last_candle_timestamp": int(period_candles[-1][0]),
+            "walk_forward_prediction_count": report["walk_forward_prediction_count"],
+            "first_test_timestamp": report["first_test_timestamp"],
+            "last_test_timestamp": report["last_test_timestamp"],
+            "directional_accuracy": report["directional_accuracy"],
+            "majority_baseline_accuracy": report["walk_forward_majority_baseline_accuracy"],
+            "buy_signal_count": report["buy_signal_count"],
+            "buy_only_fixed_stake_total_pnl_usdt": report["buy_only_fixed_stake_total_pnl_usdt"],
+            "buy_only_average_net_return_percent_per_trade": average_buy,
+            "all_test_candles_average_net_return_percent": average_market,
+            "position_strategy_trade_count": report["position_strategy_trade_count"],
+            "position_strategy_closed_trade_pnl_usdt": report["position_strategy_closed_trade_pnl_usdt"],
+            "research_gate_passed": bool(all(checks.values())),
+            "research_gate_checks": checks,
+            "real_money_trading_eligible": False,
+        })
+
+    passing_periods = sum(period["research_gate_passed"] for period in period_reports)
+    return {
+        "report_type": "experimental-multi-period-walk-forward-evaluation",
+        "multi_period_evaluation_available": True,
+        "period_count_requested": period_count,
+        "period_count_evaluated": len(period_reports),
+        "periods_are_chronologically_ordered_and_non_overlapping": True,
+        "positive_research_gate_period_count": int(passing_periods),
+        "multi_period_research_gate_passed": bool(len(period_reports) == period_count and passing_periods == period_count),
+        "periods": period_reports,
+        "method": (
+            "The available candle history is split into disjoint chronological periods. Each period is evaluated "
+            "with its own expanding walk-forward training and later test predictions; fees and slippage are included. "
+            "This is a research screen, not proof of future profitability."
+        ),
+        "real_money_trading_eligible": False,
+        "note": "This report-only evaluation never enables live trading and never submits exchange orders.",
+    }
+
+
 def main():
-    result = walk_forward_evaluate(fetch_candles())
-    result["created_at_utc"] = datetime.now(timezone.utc).isoformat()
+    candles = fetch_candles()
+    result = walk_forward_evaluate(candles)
+    multi_period_result = evaluate_multiple_unseen_periods(candles, period_count=3)
+    created_at = datetime.now(timezone.utc).isoformat()
+    result["multi_period_evaluation"] = multi_period_result
+    result["created_at_utc"] = created_at
+    multi_period_result["created_at_utc"] = created_at
     with open("walk_forward_report.json", "w", encoding="utf-8") as handle:
         json.dump(result, handle, indent=2, allow_nan=False)
+    with open("multi_period_report.json", "w", encoding="utf-8") as handle:
+        json.dump(multi_period_result, handle, indent=2, allow_nan=False)
     print("WALK-FORWARD EVALUATION — public data only; no orders.")
     print("Predictions:", result["walk_forward_prediction_count"])
     print("Directional accuracy:", round(result["directional_accuracy"], 4))
@@ -405,8 +498,16 @@ def main():
     print("Tuned average net return per trade (%):", result["tuned_buy_only_average_net_return_percent_per_trade"])
     print("Tuned threshold beats fixed threshold after costs:", result["tuned_threshold_beats_fixed_threshold_after_costs"])
     print("All-candle average net return (%):", round(result["all_test_candles_average_net_return_percent"], 4))
+    print("Multi-period evaluation available:", multi_period_result["multi_period_evaluation_available"])
+    if multi_period_result["multi_period_evaluation_available"]:
+        print("Distinct periods evaluated:", multi_period_result["period_count_evaluated"])
+        print("Periods passing the research gate:", multi_period_result["positive_research_gate_period_count"])
+        print("Multi-period research gate passed:", multi_period_result["multi_period_research_gate_passed"])
+    else:
+        print("Multi-period evaluation note:", multi_period_result["reason"])
+    print("Real-money trading eligible:", multi_period_result["real_money_trading_eligible"])
     print("Compounded figures are illustrative only, not portfolio returns.")
-    print("Report written: walk_forward_report.json")
+    print("Reports written: walk_forward_report.json and multi_period_report.json")
     print("This research report does not control paper trades or place orders.")
 
 
