@@ -102,11 +102,20 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertEqual(report["period_count_evaluated"], 3)
         self.assertTrue(report["periods_are_chronologically_ordered_and_non_overlapping"])
         self.assertFalse(report["real_money_trading_eligible"])
+        self.assertIn("directional_accuracy_beats_majority_baseline_period_count", report)
+        self.assertIn("buy_strategy_beats_one_candle_baseline_after_costs_period_count", report)
+        self.assertIn("positive_buy_only_fixed_stake_pnl_period_count", report)
+        self.assertIn("tuned_threshold_beats_fixed_threshold_after_costs_period_count", report)
         self.assertEqual(
             report["multi_period_research_gate_passed"],
             report["positive_research_gate_period_count"] == 3,
         )
         periods = report["periods"]
+        for period in periods:
+            self.assertIn("directional_accuracy_edge_over_majority_baseline_percentage_points", period)
+            self.assertIn("buy_return_edge_over_all_candles_percentage_points", period)
+            self.assertIn("buy_strategy_beats_one_candle_baseline_after_costs", period)
+            self.assertIn("tuned_threshold_beats_fixed_threshold_after_costs", period)
         self.assertLess(periods[0]["last_candle_timestamp"], periods[1]["first_candle_timestamp"])
         self.assertLess(periods[1]["last_candle_timestamp"], periods[2]["first_candle_timestamp"])
         self.assertTrue(all(not period["real_money_trading_eligible"] for period in periods))
