@@ -96,6 +96,23 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertEqual(result["position_strategy_trade_count"], 0)
         self.assertEqual(result["position_strategy_closed_trade_pnl_usdt"], 0.0)
 
+    def test_multiple_unseen_period_evaluation_is_disjoint_and_never_live_eligible(self):
+        report = walk_forward_backtest.evaluate_multiple_unseen_periods(make_candles(600), period_count=3)
+        self.assertTrue(report["multi_period_evaluation_available"])
+        self.assertEqual(report["period_count_evaluated"], 3)
+        self.assertTrue(report["periods_are_chronologically_ordered_and_non_overlapping"])
+        self.assertFalse(report["real_money_trading_eligible"])
+        self.assertFalse(report["multi_period_research_gate_passed"] if report["positive_research_gate_period_count"] < 3 else True)
+        periods = report["periods"]
+        self.assertLess(periods[0]["last_candle_timestamp"], periods[1]["first_candle_timestamp"])
+        self.assertLess(periods[1]["last_candle_timestamp"], periods[2]["first_candle_timestamp"])
+        self.assertTrue(all(not period["real_money_trading_eligible"] for period in periods))
+
+    def test_multiple_period_evaluation_reports_insufficient_data_safely(self):
+        report = walk_forward_backtest.evaluate_multiple_unseen_periods(make_candles(220), period_count=3)
+        self.assertFalse(report["multi_period_evaluation_available"])
+        self.assertFalse(report["real_money_trading_eligible"])
+
     def test_rejects_too_little_data(self):
         with self.assertRaises(ValueError):
             walk_forward_backtest.walk_forward_evaluate(make_candles(80))
