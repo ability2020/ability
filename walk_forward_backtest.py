@@ -441,10 +441,24 @@ def evaluate_multiple_unseen_periods(candles, period_count=3):
             "last_test_timestamp": report["last_test_timestamp"],
             "directional_accuracy": report["directional_accuracy"],
             "majority_baseline_accuracy": report["walk_forward_majority_baseline_accuracy"],
+            "directional_accuracy_beats_majority_baseline": report["directional_accuracy_beats_majority_baseline"],
+            "directional_accuracy_edge_over_majority_baseline_percentage_points": (
+                report["directional_accuracy"] - report["walk_forward_majority_baseline_accuracy"]
+            ) * 100.0,
             "buy_signal_count": report["buy_signal_count"],
             "buy_only_fixed_stake_total_pnl_usdt": report["buy_only_fixed_stake_total_pnl_usdt"],
             "buy_only_average_net_return_percent_per_trade": average_buy,
             "all_test_candles_average_net_return_percent": average_market,
+            "buy_return_edge_over_all_candles_percentage_points": (
+                average_buy - average_market if average_buy is not None and average_market is not None else None
+            ),
+            "buy_strategy_beats_one_candle_baseline_after_costs": (
+                average_buy is not None and average_market is not None and average_buy > average_market
+            ),
+            "tuned_buy_signal_count": report["tuned_buy_signal_count"],
+            "tuned_buy_only_fixed_stake_total_pnl_usdt": report["tuned_buy_only_fixed_stake_total_pnl_usdt"],
+            "tuned_buy_only_average_net_return_percent_per_trade": report["tuned_buy_only_average_net_return_percent_per_trade"],
+            "tuned_threshold_beats_fixed_threshold_after_costs": report["tuned_threshold_beats_fixed_threshold_after_costs"],
             "position_strategy_trade_count": report["position_strategy_trade_count"],
             "position_strategy_closed_trade_pnl_usdt": report["position_strategy_closed_trade_pnl_usdt"],
             "research_gate_passed": bool(all(checks.values())),
@@ -453,14 +467,29 @@ def evaluate_multiple_unseen_periods(candles, period_count=3):
         })
 
     passing_periods = sum(period["research_gate_passed"] for period in period_reports)
+    directional_wins = sum(period["directional_accuracy_beats_majority_baseline"] for period in period_reports)
+    cost_adjusted_benchmark_wins = sum(
+        period["buy_strategy_beats_one_candle_baseline_after_costs"] for period in period_reports
+    )
+    positive_pnl_periods = sum(period["buy_only_fixed_stake_total_pnl_usdt"] > 0 for period in period_reports)
+    tuned_threshold_wins = sum(period["tuned_threshold_beats_fixed_threshold_after_costs"] for period in period_reports)
     return {
         "report_type": "experimental-multi-period-walk-forward-evaluation",
         "multi_period_evaluation_available": True,
         "period_count_requested": period_count,
         "period_count_evaluated": len(period_reports),
         "periods_are_chronologically_ordered_and_non_overlapping": True,
+        "directional_accuracy_beats_majority_baseline_period_count": int(directional_wins),
+        "buy_strategy_beats_one_candle_baseline_after_costs_period_count": int(cost_adjusted_benchmark_wins),
+        "positive_buy_only_fixed_stake_pnl_period_count": int(positive_pnl_periods),
+        "tuned_threshold_beats_fixed_threshold_after_costs_period_count": int(tuned_threshold_wins),
         "positive_research_gate_period_count": int(passing_periods),
         "multi_period_research_gate_passed": bool(len(period_reports) == period_count and passing_periods == period_count),
+        "benchmark_interpretation": (
+            "A model is more convincing when directional accuracy beats the training-fold majority baseline "
+            "and selected BUY returns beat the same-period one-candle always-buy benchmark after estimated "
+            "fees and slippage. Counts show consistency across periods, not proof of future performance."
+        ),
         "periods": period_reports,
         "method": (
             "The available candle history is split into disjoint chronological periods. Each period is evaluated "
