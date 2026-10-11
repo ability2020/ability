@@ -33,6 +33,7 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertIn("walk_forward_majority_baseline_accuracy", report)
         self.assertIn("directional_accuracy_beats_majority_baseline", report)
         self.assertIn("threshold_tuning_method", report)
+        self.assertIn("positive", report["threshold_tuning_method"])
         self.assertGreaterEqual(report["selected_buy_threshold_min"], 0.5)
         self.assertLessEqual(report["selected_buy_threshold_max"], 1.0)
         self.assertIn("tuned_buy_only_fixed_stake_total_pnl_usdt", report)
