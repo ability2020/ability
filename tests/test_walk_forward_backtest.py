@@ -62,6 +62,40 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertFalse(losing["single_period_research_gate_passed"])
         self.assertFalse(losing["single_period_research_gate_checks"]["positive_average_net_buy_return"])
 
+    def test_position_strategy_uses_stop_loss_and_includes_costs(self):
+        import pandas as pd
+
+        usable = pd.DataFrame([
+            {"timestamp": 1, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+            {"timestamp": 2, "open": 100.0, "high": 100.5, "low": 97.0, "close": 98.0},
+        ])
+        predictions = [
+            {"timestamp": 1, "signal": "BUY"},
+            {"timestamp": 2, "signal": "WAIT"},
+        ]
+        result = walk_forward_backtest.simulate_position_strategy(
+            usable, predictions, stop_loss_percent=2.0, take_profit_percent=3.0
+        )
+        self.assertEqual(result["position_strategy_trade_count"], 1)
+        self.assertEqual(result["position_strategy_exit_reasons"]["STOP_LOSS"], 1)
+        self.assertLess(result["position_strategy_closed_trade_pnl_usdt"], 0)
+        self.assertFalse(result.get("real_money_trading_eligible", True))
+
+    def test_position_strategy_does_not_enter_on_sell_or_wait(self):
+        import pandas as pd
+
+        usable = pd.DataFrame([
+            {"timestamp": 1, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+            {"timestamp": 2, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+        ])
+        predictions = [
+            {"timestamp": 1, "signal": "WAIT"},
+            {"timestamp": 2, "signal": "SELL"},
+        ]
+        result = walk_forward_backtest.simulate_position_strategy(usable, predictions)
+        self.assertEqual(result["position_strategy_trade_count"], 0)
+        self.assertEqual(result["position_strategy_closed_trade_pnl_usdt"], 0.0)
+
     def test_rejects_too_little_data(self):
         with self.assertRaises(ValueError):
             walk_forward_backtest.walk_forward_evaluate(make_candles(80))
