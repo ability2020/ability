@@ -53,6 +53,49 @@ def _net_one_candle_return(entry_close, next_close):
     return (exit_proceeds_after_fee - STAKE_USDT - entry_fee) / STAKE_USDT
 
 
+def _select_buy_threshold(train, usable):
+    """Select a threshold using only an inner chronological validation slice of training data."""
+    candidates = (0.52, 0.55, 0.58, 0.62, 0.65, 0.70)
+    split = int(len(train) * 0.8)
+    fit = train.iloc[:split]
+    validation = train.iloc[split:]
+    # Too little validation data to compare thresholds meaningfully: keep the
+    # conservative configured threshold rather than tuning on a tiny sample.
+    if len(fit) < MIN_SAMPLES or len(validation) < 20 or fit["target"].nunique() < 2:
+        return BUY_THRESHOLD
+
+    validation_model = make_pipeline(
+        StandardScaler(),
+        LogisticRegression(max_iter=1000, class_weight="balanced", random_state=42),
+    )
+    validation_model.fit(fit[FEATURE_COLUMNS], fit["target"].astype(int))
+    probabilities = validation_model.predict_proba(validation[FEATURE_COLUMNS])[:, 1]
+    best_threshold = BUY_THRESHOLD
+    best_average_return = None
+    minimum_trades = 5
+
+    for threshold in candidates:
+        selected_positions = np.flatnonzero(probabilities >= threshold)
+        if len(selected_positions) < minimum_trades:
+            continue
+        returns = []
+        for position in selected_positions:
+            row_index = int(validation.index[position])
+            if row_index + 1 >= len(usable):
+                continue
+            returns.append(_net_one_candle_return(
+                float(usable.iloc[row_index]["close"]),
+                float(usable.iloc[row_index + 1]["close"]),
+            ))
+        if len(returns) < minimum_trades:
+            continue
+        average_return = float(np.mean(returns))
+        if best_average_return is None or average_return > best_average_return:
+            best_average_return = average_return
+            best_threshold = threshold
+    return float(best_threshold)
+
+
 def walk_forward_evaluate(candles):
     _validate_settings()
     frame = build_feature_frame(candles)
@@ -65,6 +108,9 @@ def walk_forward_evaluate(candles):
 
     predictions = []
     trade_returns = []
+    tuned_trade_returns = []
+    selected_thresholds = []
+    tuned_buy_count = 0
     baseline_returns = []
     directional_actual = []
     directional_predictions = []
@@ -86,12 +132,20 @@ def walk_forward_evaluate(candles):
         )
         model.fit(train[FEATURE_COLUMNS], train["target"].astype(int))
         probability_up = float(model.predict_proba(current[FEATURE_COLUMNS])[:, 1][0])
+        selected_threshold = _select_buy_threshold(train, usable)
+        selected_thresholds.append(selected_threshold)
         actual_up = int(float(current.iloc[0]["close"]) < float(usable.iloc[i + 1]["close"]))
         predicted_up = int(probability_up >= 0.5)
         directional_actual.append(actual_up)
         directional_predictions.append(predicted_up)
         # Compare each prediction with a baseline learned only from that fold's training data.
         majority_baseline_predictions.append(int(train["target"].mean() >= 0.5))
+
+        if probability_up >= selected_threshold:
+            tuned_buy_count += 1
+            tuned_trade_returns.append(_net_one_candle_return(
+                float(usable.iloc[i]["close"]), float(usable.iloc[i + 1]["close"])
+            ))
 
         if probability_up >= BUY_THRESHOLD:
             signal = "BUY"
@@ -124,6 +178,8 @@ def walk_forward_evaluate(candles):
     # Fixed-stake PnL makes the assumed exposure explicit. Compounded returns
     # below are illustrative and are not a portfolio-level simulation.
     fixed_stake_pnl_usdt = float(sum(trade_returns) * STAKE_USDT)
+    tuned_fixed_stake_pnl_usdt = float(sum(tuned_trade_returns) * STAKE_USDT)
+    tuned_average_buy_return = float(np.mean(tuned_trade_returns)) if tuned_trade_returns else None
     average_buy_return = float(np.mean(trade_returns)) if trade_returns else None
     average_market_return = float(np.mean(baseline_returns))
     net_total_return = float(np.prod([1.0 + r for r in trade_returns]) - 1.0) if trade_returns else 0.0
@@ -142,6 +198,16 @@ def walk_forward_evaluate(candles):
         "walk_forward_majority_baseline_accuracy": float(accuracy_score(directional_actual, majority_baseline_predictions)),
         "directional_accuracy_beats_majority_baseline": bool(accuracy_score(directional_actual, directional_predictions) > accuracy_score(directional_actual, majority_baseline_predictions)),
         "buy_signal_count": buy_count,
+        "threshold_tuning_method": "At each walk-forward step, compare fixed candidate BUY thresholds on an inner chronological validation slice from that step's training data only; use the selected threshold only for that step. If validation is too small or has fewer than five candidate trades, fall back to ML_BUY_THRESHOLD. This is exploratory and can overfit the inner validation slice.",
+        "configured_buy_threshold": BUY_THRESHOLD,
+        "selected_buy_threshold_min": float(min(selected_thresholds)),
+        "selected_buy_threshold_max": float(max(selected_thresholds)),
+        "selected_buy_threshold_mean": float(np.mean(selected_thresholds)),
+        "tuned_buy_signal_count": int(tuned_buy_count),
+        "tuned_buy_only_fixed_stake_total_pnl_usdt": tuned_fixed_stake_pnl_usdt,
+        "tuned_buy_only_average_net_return_percent_per_trade": tuned_average_buy_return * 100 if tuned_average_buy_return is not None else None,
+        "tuned_buy_signals_average_return_beats_all_candles_after_costs": bool(tuned_average_buy_return > average_market_return) if tuned_average_buy_return is not None else False,
+        "tuned_threshold_beats_fixed_threshold_after_costs": bool(tuned_average_buy_return > average_buy_return) if tuned_average_buy_return is not None and average_buy_return is not None else False,
         "sell_signal_count": sell_count,
         "wait_signal_count": wait_count,
         "trade_test_method": "Each BUY prediction is a hypothetical one-candle Spot long, entered at that candle close and exited at the next close. Each trade uses a fixed stake; actual portfolio allocation, idle cash, and order execution are not simulated.",
@@ -171,6 +237,7 @@ def walk_forward_evaluate(candles):
             "Fee and slippage assumptions may differ from actual Bitget account costs.",
             "SELL predictions are reported but this Spot test does not short-sell.",
             "No exchange account is accessed and no orders are submitted.",
+            "Threshold tuning uses only each fold's training period, but repeated threshold comparisons can still overfit; validate across more symbols and later unseen periods before any live use.",
         ],
         "sample_predictions": predictions[-10:],
     }
@@ -190,6 +257,10 @@ def main():
     print("BUY / SELL / WAIT:", result["buy_signal_count"], "/", result["sell_signal_count"], "/", result["wait_signal_count"])
     print("BUY-only fixed-stake total PnL (USDT):", round(result["buy_only_fixed_stake_total_pnl_usdt"], 4))
     print("BUY-only average net return per trade (%):", result["buy_only_average_net_return_percent_per_trade"])
+    print("Tuned threshold range:", result["selected_buy_threshold_min"], "to", result["selected_buy_threshold_max"])
+    print("Tuned BUY count / fixed-stake PnL (USDT):", result["tuned_buy_signal_count"], "/", round(result["tuned_buy_only_fixed_stake_total_pnl_usdt"], 4))
+    print("Tuned average net return per trade (%):", result["tuned_buy_only_average_net_return_percent_per_trade"])
+    print("Tuned threshold beats fixed threshold after costs:", result["tuned_threshold_beats_fixed_threshold_after_costs"])
     print("All-candle average net return (%):", round(result["all_test_candles_average_net_return_percent"], 4))
     print("Compounded figures are illustrative only, not portfolio returns.")
     print("Report written: walk_forward_report.json")
