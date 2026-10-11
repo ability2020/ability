@@ -33,6 +33,9 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertIn("walk_forward_majority_baseline_accuracy", report)
         self.assertIn("directional_accuracy_beats_majority_baseline", report)
         self.assertIn("threshold_tuning_method", report)
+        self.assertIn("single_period_research_gate_passed", report)
+        self.assertIn("single_period_research_gate_checks", report)
+        self.assertFalse(report["real_money_trading_eligible"])
         self.assertIn("positive", report["threshold_tuning_method"])
         self.assertGreaterEqual(report["selected_buy_threshold_min"], 0.5)
         self.assertLessEqual(report["selected_buy_threshold_max"], 1.0)
@@ -45,6 +48,19 @@ class WalkForwardBacktestTests(unittest.TestCase):
             report["walk_forward_prediction_count"],
         )
         self.assertIn("no orders are submitted", " ".join(report["caveats"]))
+
+    def test_research_gate_requires_positive_after_costs_and_benchmark_outperformance(self):
+        passing = walk_forward_backtest.evaluate_research_gate(
+            860, 50, 0.002, -0.001, 1.0
+        )
+        self.assertTrue(passing["single_period_research_gate_passed"])
+        self.assertFalse(passing["real_money_trading_eligible"])
+
+        losing = walk_forward_backtest.evaluate_research_gate(
+            860, 50, -0.003, -0.001, -1.0
+        )
+        self.assertFalse(losing["single_period_research_gate_passed"])
+        self.assertFalse(losing["single_period_research_gate_checks"]["positive_average_net_buy_return"])
 
     def test_rejects_too_little_data(self):
         with self.assertRaises(ValueError):
