@@ -102,7 +102,10 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertEqual(report["period_count_evaluated"], 3)
         self.assertTrue(report["periods_are_chronologically_ordered_and_non_overlapping"])
         self.assertFalse(report["real_money_trading_eligible"])
-        self.assertFalse(report["multi_period_research_gate_passed"] if report["positive_research_gate_period_count"] < 3 else True)
+        self.assertEqual(
+            report["multi_period_research_gate_passed"],
+            report["positive_research_gate_period_count"] == 3,
+        )
         periods = report["periods"]
         self.assertLess(periods[0]["last_candle_timestamp"], periods[1]["first_candle_timestamp"])
         self.assertLess(periods[1]["last_candle_timestamp"], periods[2]["first_candle_timestamp"])
