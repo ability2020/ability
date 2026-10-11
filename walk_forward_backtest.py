@@ -93,6 +93,10 @@ def _select_buy_threshold(train, usable):
         if best_average_return is None or average_return > best_average_return:
             best_average_return = average_return
             best_threshold = threshold
+    # Do not adopt a threshold whose inner validation trades are not profitable
+    # after estimated fees and slippage. Fall back to the configured threshold.
+    if best_average_return is None or best_average_return <= 0.0:
+        return BUY_THRESHOLD
     return float(best_threshold)
 
 
@@ -198,7 +202,7 @@ def walk_forward_evaluate(candles):
         "walk_forward_majority_baseline_accuracy": float(accuracy_score(directional_actual, majority_baseline_predictions)),
         "directional_accuracy_beats_majority_baseline": bool(accuracy_score(directional_actual, directional_predictions) > accuracy_score(directional_actual, majority_baseline_predictions)),
         "buy_signal_count": buy_count,
-        "threshold_tuning_method": "At each walk-forward step, compare fixed candidate BUY thresholds on an inner chronological validation slice from that step's training data only; use the selected threshold only for that step. If validation is too small or has fewer than five candidate trades, fall back to ML_BUY_THRESHOLD. This is exploratory and can overfit the inner validation slice.",
+        "threshold_tuning_method": "At each walk-forward step, compare fixed candidate BUY thresholds on an inner chronological validation slice from that step's training data only; use the selected threshold only for that step only if its average estimated net return is positive. If validation is too small, has fewer than five candidate trades, or no candidate has positive average net return after estimated costs, fall back to ML_BUY_THRESHOLD. This is exploratory and can overfit the inner validation slice.",
         "configured_buy_threshold": BUY_THRESHOLD,
         "selected_buy_threshold_min": float(min(selected_thresholds)),
         "selected_buy_threshold_max": float(max(selected_thresholds)),
@@ -237,7 +241,7 @@ def walk_forward_evaluate(candles):
             "Fee and slippage assumptions may differ from actual Bitget account costs.",
             "SELL predictions are reported but this Spot test does not short-sell.",
             "No exchange account is accessed and no orders are submitted.",
-            "Threshold tuning uses only each fold's training period, but repeated threshold comparisons can still overfit; validate across more symbols and later unseen periods before any live use.",
+            "Threshold tuning uses only each fold's training period and rejects candidate thresholds without positive average validation return after estimated costs, but repeated comparisons can still overfit; validate across more symbols and later unseen periods before any live use.",
         ],
         "sample_predictions": predictions[-10:],
     }
