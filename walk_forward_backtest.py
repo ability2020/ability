@@ -126,6 +126,109 @@ def evaluate_research_gate(prediction_count, buy_count, average_buy_return, aver
     }
 
 
+
+def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_profit_percent=3.0):
+    """Simulate one long Spot position at a time using OHLC stop/target exits.
+
+    Entries use the signal candle close; exits are checked on later candles.
+    If stop-loss and take-profit are both touched in one candle, assume the
+    stop-loss happens first (conservative). Includes estimated fees/slippage.
+    This is research-only and never sends orders.
+    """
+    if not (0 < float(stop_loss_percent) < 100 and float(take_profit_percent) > 0):
+        raise ValueError("Stop loss must be in (0, 100) and take profit must be positive.")
+    index_by_timestamp = {
+        int(row["timestamp"]): idx for idx, (_, row) in enumerate(usable.iterrows())
+    }
+    signal_by_index = {
+        index_by_timestamp[int(pred["timestamp"])]: pred["signal"]
+        for pred in predictions if int(pred["timestamp"]) in index_by_timestamp
+    }
+    position = None
+    trades = []
+    for i in sorted(signal_by_index):
+        row = usable.iloc[i]
+        signal = signal_by_index[i]
+        if position is not None and i > position["entry_index"]:
+            entry = position["entry_price"]
+            stop_price = entry * (1.0 - stop_loss_percent / 100.0)
+            target_price = entry * (1.0 + take_profit_percent / 100.0)
+            low = float(row["low"])
+            high = float(row["high"])
+            exit_price = None
+            exit_reason = None
+            if low <= stop_price:
+                exit_price, exit_reason = stop_price, "STOP_LOSS"
+            elif high >= target_price:
+                exit_price, exit_reason = target_price, "TAKE_PROFIT"
+            elif signal == "SELL":
+                exit_price, exit_reason = float(row["close"]), "SELL_SIGNAL"
+            if exit_price is not None:
+                exit_execution = exit_price * (1.0 - SLIPPAGE_RATE)
+                proceeds = position["quantity"] * exit_execution * (1.0 - FEE_RATE)
+                pnl = proceeds - STAKE_USDT - position["entry_fee"]
+                trades.append({
+                    "entry_timestamp": position["entry_timestamp"],
+                    "exit_timestamp": int(row["timestamp"]),
+                    "entry_price": position["entry_price"],
+                    "exit_price": exit_price,
+                    "pnl_usdt": float(pnl),
+                    "net_return_percent": float(pnl / STAKE_USDT * 100.0),
+                    "exit_reason": exit_reason,
+                })
+                position = None
+        if position is None and signal == "BUY":
+            entry_reference = float(row["close"])
+            entry_execution = entry_reference * (1.0 + SLIPPAGE_RATE)
+            position = {
+                "entry_index": i,
+                "entry_timestamp": int(row["timestamp"]),
+                "entry_price": entry_reference,
+                "quantity": STAKE_USDT / entry_execution,
+                "entry_fee": STAKE_USDT * FEE_RATE,
+            }
+
+    if position is not None:
+        row = usable.iloc[max(signal_by_index)]
+        exit_price = float(row["close"])
+        exit_execution = exit_price * (1.0 - SLIPPAGE_RATE)
+        proceeds = position["quantity"] * exit_execution * (1.0 - FEE_RATE)
+        pnl = proceeds - STAKE_USDT - position["entry_fee"]
+        trades.append({
+            "entry_timestamp": position["entry_timestamp"],
+            "exit_timestamp": int(row["timestamp"]),
+            "entry_price": position["entry_price"],
+            "exit_price": exit_price,
+            "pnl_usdt": float(pnl),
+            "net_return_percent": float(pnl / STAKE_USDT * 100.0),
+            "exit_reason": "END_OF_TEST",
+        })
+
+    total_pnl = float(sum(trade["pnl_usdt"] for trade in trades))
+    return {
+        "position_strategy_stop_loss_percent": float(stop_loss_percent),
+        "position_strategy_take_profit_percent": float(take_profit_percent),
+        "position_strategy_trade_count": len(trades),
+        "position_strategy_closed_trade_pnl_usdt": total_pnl,
+        "position_strategy_average_net_return_percent_per_trade": (
+            float(np.mean([trade["net_return_percent"] for trade in trades])) if trades else None
+        ),
+        "position_strategy_win_rate_percent": (
+            float(np.mean([trade["pnl_usdt"] > 0 for trade in trades]) * 100.0) if trades else None
+        ),
+        "position_strategy_exit_reasons": {
+            reason: sum(trade["exit_reason"] == reason for trade in trades)
+            for reason in ("STOP_LOSS", "TAKE_PROFIT", "SELL_SIGNAL", "END_OF_TEST")
+        },
+        "position_strategy_trades_sample": trades[-20:],
+        "position_strategy_method": (
+            "Long-only Spot simulation, one position at a time. Entry at signal candle close; "
+            "later candle OHLC checks stop-loss/take-profit before SELL signal. If both stop "
+            "and target are touched in one candle, stop-loss is assumed first. Estimated "
+            "fees/slippage included; no account balance, exchange execution, or orders."
+        ),
+    }
+
 def walk_forward_evaluate(candles):
     _validate_settings()
     frame = build_feature_frame(candles)
@@ -216,6 +319,7 @@ def walk_forward_evaluate(candles):
         len(predictions), len(trade_returns), average_buy_return,
         average_market_return, fixed_stake_pnl_usdt,
     )
+    position_strategy = simulate_position_strategy(usable, predictions)
     net_total_return = float(np.prod([1.0 + r for r in trade_returns]) - 1.0) if trade_returns else 0.0
     baseline_total_return = float(np.prod([1.0 + r for r in baseline_returns]) - 1.0)
     return {
@@ -233,6 +337,7 @@ def walk_forward_evaluate(candles):
         "directional_accuracy_beats_majority_baseline": bool(accuracy_score(directional_actual, directional_predictions) > accuracy_score(directional_actual, majority_baseline_predictions)),
         "buy_signal_count": buy_count,
         **research_gate,
+        **position_strategy,
         "threshold_tuning_method": "At each walk-forward step, compare fixed candidate BUY thresholds on an inner chronological validation slice from that step's training data only; use the selected threshold only for that step only if its average estimated net return is positive. If validation is too small, has fewer than five candidate trades, or no candidate has positive average net return after estimated costs, fall back to ML_BUY_THRESHOLD. This is exploratory and can overfit the inner validation slice.",
         "configured_buy_threshold": BUY_THRESHOLD,
         "selected_buy_threshold_min": float(min(selected_thresholds)),
@@ -271,6 +376,7 @@ def walk_forward_evaluate(candles):
             "Order-book depth, spread variation, partial fills, idle cash, and taxes are not modelled.",
             "Fee and slippage assumptions may differ from actual Bitget account costs.",
             "SELL predictions are reported but this Spot test does not short-sell.",
+            "Position-based stop-loss/take-profit simulation uses candle OHLC; intrabar ordering is unknown and stop-loss-first is assumed when both levels are touched.",
             "No exchange account is accessed and no orders are submitted.",
             "Threshold tuning uses only each fold's training period and rejects candidate thresholds without positive average validation return after estimated costs, but repeated comparisons can still overfit; validate across more symbols and later unseen periods before any live use.",
         ],
