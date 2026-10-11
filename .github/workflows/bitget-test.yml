@@ -355,5 +355,6 @@ jobs:
             paper_signal.json
             ml_report.json
             walk_forward_report.json
+            multi_period_report.json
           if-no-files-found: warn
           retention-days: 30
