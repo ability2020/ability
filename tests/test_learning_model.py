@@ -35,6 +35,16 @@ class LearningModelTests(unittest.TestCase):
         self.assertIn(report["model_signal"], ("BUY", "SELL", "WAIT"))
         self.assertIn("test_accuracy", report)
         self.assertIn("majority_baseline_accuracy", report)
+        self.assertIn("majority_baseline_balanced_accuracy", report)
+        self.assertIn("probability_brier_score", report)
+        self.assertGreaterEqual(report["probability_brier_score"], 0.0)
+        self.assertLessEqual(report["probability_brier_score"], 1.0)
+        self.assertIn("buy_threshold_precision", report)
+        self.assertIn("buy_threshold_recall", report)
+        self.assertEqual(
+            sum(report["confusion_matrix"].values()),
+            report["test_sample_count"],
+        )
         self.assertIn("does not control paper trades", report["safety_note"])
 
     def test_rejects_too_little_data(self):
