@@ -41,6 +41,9 @@ jobs:
       - name: Train and evaluate experimental learning model (no orders)
         run: python learning_model.py
 
+      - name: Compare baseline and expanded features chronologically (no orders)
+        run: python feature_ablation.py
+
       - name: Walk-forward backtest with estimated fees and slippage (no orders)
         run: python walk_forward_backtest.py
 
@@ -356,5 +359,6 @@ jobs:
             ml_report.json
             walk_forward_report.json
             multi_period_report.json
+            feature_ablation_report.json
           if-no-files-found: warn
           retention-days: 30
