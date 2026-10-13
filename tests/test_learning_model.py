@@ -27,6 +27,9 @@ class LearningModelTests(unittest.TestCase):
         self.assertTrue(frame["timestamp"].is_monotonic_increasing)
         self.assertTrue(np.isnan(frame.iloc[-1]["target"]))
         self.assertGreater(frame["return_1"].notna().sum(), 150)
+        for feature in ("rsi_14", "macd_hist_pct", "atr_pct", "volume_zscore_20"):
+            self.assertIn(feature, frame.columns)
+        self.assertTrue(frame["rsi_14"].dropna().between(0, 100).all())
 
     def test_training_uses_chronological_holdout_and_emits_signal(self):
         report = learning_model.train_and_evaluate(make_candles())
