@@ -1,7 +1,19 @@
 import unittest
 
 import feature_ablation
-from tests.test_learning_model import make_candles
+
+
+def make_candles(count=500):
+    candles = []
+    price = 100.0
+    for i in range(count):
+        change = 0.002 if (i // 7) % 2 == 0 else -0.001
+        open_price = price
+        price = price * (1 + change)
+        high = max(open_price, price) * 1.001
+        low = min(open_price, price) * 0.999
+        candles.append([str(1_700_000_000_000 + i * 300_000), str(open_price), str(high), str(low), str(price), str(100 + (i % 11)), "0"])
+    return list(reversed(candles))
 
 
 class FeatureAblationTests(unittest.TestCase):
