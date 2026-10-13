@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import requests
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, balanced_accuracy_score
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, brier_score_loss, precision_score, recall_score, confusion_matrix
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -122,7 +122,22 @@ def train_and_evaluate(candles):
     accuracy = float(accuracy_score(actual, test_predictions))
     balanced_accuracy = float(balanced_accuracy_score(actual, test_predictions))
     majority_class = int(train["target"].mean() >= 0.5)
-    baseline_accuracy = float(np.mean(actual == majority_class))
+    baseline_predictions = np.full(len(actual), majority_class, dtype=int)
+    baseline_accuracy = float(accuracy_score(actual, baseline_predictions))
+    baseline_balanced_accuracy = float(
+        balanced_accuracy_score(actual, baseline_predictions)
+    )
+    probability_brier_score = float(brier_score_loss(actual, test_probabilities))
+    buy_threshold_predictions = (test_probabilities >= 0.58).astype(int)
+    buy_threshold_precision = float(
+        precision_score(actual, buy_threshold_predictions, zero_division=0)
+    )
+    buy_threshold_recall = float(
+        recall_score(actual, buy_threshold_predictions, zero_division=0)
+    )
+    true_negative, false_positive, false_negative, true_positive = (
+        int(value) for value in confusion_matrix(actual, test_predictions, labels=[0, 1]).ravel()
+    )
 
     # Latest candle's next-candle label is unknown; prediction is for the next candle.
     if latest[FEATURE_COLUMNS].isna().to_numpy().any():
@@ -152,7 +167,19 @@ def train_and_evaluate(candles):
         "test_accuracy": accuracy,
         "test_balanced_accuracy": balanced_accuracy,
         "majority_baseline_accuracy": baseline_accuracy,
+        "majority_baseline_balanced_accuracy": baseline_balanced_accuracy,
         "test_beats_baseline": bool(accuracy > baseline_accuracy),
+        "probability_brier_score": probability_brier_score,
+        "brier_score_note": "Lower is better; 0 is perfect and 0.25 is the reference score for constant 0.5 probabilities on a balanced binary target.",
+        "buy_threshold_for_diagnostics": 0.58,
+        "buy_threshold_precision": buy_threshold_precision,
+        "buy_threshold_recall": buy_threshold_recall,
+        "confusion_matrix": {
+            "true_negative": true_negative,
+            "false_positive": false_positive,
+            "false_negative": false_negative,
+            "true_positive": true_positive,
+        },
         "latest_candle_timestamp": int(latest.iloc[0]["timestamp"]),
         "latest_close": float(latest.iloc[0]["close"]),
         "next_candle_up_probability": latest_probability,
