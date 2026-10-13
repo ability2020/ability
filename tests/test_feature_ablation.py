@@ -31,6 +31,18 @@ class FeatureAblationTests(unittest.TestCase):
             self.assertTrue(all(fold["train_count"] > 0 and fold["test_count"] > 0 for fold in folds))
             self.assertTrue(all(0 <= fold["test_accuracy"] <= 1 for fold in folds))
             self.assertTrue(all(0 <= fold["brier_score"] <= 1 for fold in folds))
+            for fold in folds:
+                self.assertEqual(set(fold["threshold_diagnostics"]), {"0.55", "0.58", "0.62"})
+                for diagnostic in fold["threshold_diagnostics"].values():
+                    self.assertGreaterEqual(diagnostic["buy_signal_count"], 0)
+                    self.assertTrue(isinstance(diagnostic["net_pnl_usdt"], float))
+                    self.assertGreaterEqual(diagnostic["max_drawdown_usdt"], 0)
+            self.assertEqual(
+                set(result["threshold_diagnostics"]), {"0.55", "0.58", "0.62"}
+            )
+            for diagnostic in result["threshold_diagnostics"].values():
+                self.assertGreaterEqual(diagnostic["buy_signal_count"], 0)
+                self.assertGreaterEqual(diagnostic["max_fold_drawdown_usdt"], 0)
 
     def test_reports_insufficient_data_safely(self):
         report = feature_ablation.compare_feature_sets(make_candles(100))
