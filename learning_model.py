@@ -22,12 +22,13 @@ SYMBOL = os.getenv("BITGET_SYMBOL", "BTCUSDT")
 INTERVAL = os.getenv("BITGET_INTERVAL", "5m")
 CANDLE_LIMIT = 1000  # Larger historical sample for more informative research tests
 MIN_SAMPLES = 120
-MODEL_VERSION = "logistic-direction-v1"
+MODEL_VERSION = "logistic-direction-v2-expanded-features"
 
 FEATURE_COLUMNS = [
     "return_1", "return_3", "return_6",
     "sma_gap_5", "sma_gap_10", "sma_gap_20",
     "volatility_10", "range_pct", "body_pct", "volume_change",
+    "rsi_14", "macd_hist_pct", "atr_pct", "volume_zscore_20",
 ]
 
 
@@ -85,6 +86,32 @@ def build_feature_frame(candles):
     frame["range_pct"] = (frame["high"] - frame["low"]) / close
     frame["body_pct"] = (frame["close"] - frame["open"]) / frame["open"]
     frame["volume_change"] = frame["volume"].pct_change().replace([np.inf, -np.inf], np.nan)
+
+    # Expanded indicators use only the current and earlier candles.
+    delta = close.diff()
+    average_gain = delta.clip(lower=0).rolling(14).mean()
+    average_loss = (-delta.clip(upper=0)).rolling(14).mean()
+    relative_strength = average_gain / average_loss.replace(0, np.nan)
+    frame["rsi_14"] = (100.0 - (100.0 / (1.0 + relative_strength))).fillna(50.0)
+
+    ema_12 = close.ewm(span=12, adjust=False, min_periods=12).mean()
+    ema_26 = close.ewm(span=26, adjust=False, min_periods=26).mean()
+    macd = ema_12 - ema_26
+    macd_signal = macd.ewm(span=9, adjust=False, min_periods=9).mean()
+    frame["macd_hist_pct"] = (macd - macd_signal) / close
+
+    previous_close = close.shift(1)
+    true_range = pd.concat([
+        frame["high"] - frame["low"],
+        (frame["high"] - previous_close).abs(),
+        (frame["low"] - previous_close).abs(),
+    ], axis=1).max(axis=1)
+    frame["atr_pct"] = true_range.rolling(14).mean() / close
+
+    volume_mean = frame["volume"].rolling(20).mean()
+    volume_std = frame["volume"].rolling(20).std().replace(0, np.nan)
+    frame["volume_zscore_20"] = ((frame["volume"] - volume_mean) / volume_std).fillna(0.0)
+
     # Label at candle t is whether candle t+1 closes above candle t.
     frame["target"] = (close.shift(-1) > close).astype(float)
     frame.loc[close.shift(-1).isna(), "target"] = np.nan
