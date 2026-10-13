@@ -57,11 +57,27 @@ def evaluate_feature_set(usable, features, fold_count=3):
         probabilities = model.predict_proba(test[features])[:, 1]
         actual = test["target"].astype(int).to_numpy()
         predicted = (probabilities >= 0.5).astype(int)
-        buy_returns = [
+        fold_returns = [
             _net_return(float(usable.iloc[i]["close"]), float(usable.iloc[i + 1]["close"]))
-            for i, probability in zip(test.index, probabilities)
-            if probability >= BUY_THRESHOLD and i + 1 < len(usable)
+            if i + 1 < len(usable) else 0.0
+            for i in test.index
         ]
+        threshold_diagnostics = {}
+        for threshold in (0.55, 0.58, 0.62):
+            selected = [float(fold_returns[j]) for j, probability in enumerate(probabilities) if probability >= threshold]
+            pnl_values = [value * STAKE_USDT for value in selected]
+            cumulative = np.cumsum([0.0] + pnl_values)
+            peaks = np.maximum.accumulate(cumulative)
+            threshold_diagnostics[str(threshold)] = {
+                "buy_signal_count": int(len(selected)),
+                "net_pnl_usdt": float(sum(pnl_values)),
+                "average_net_return_percent": float(np.mean(selected) * 100) if selected else None,
+                "max_drawdown_usdt": float(np.max(peaks - cumulative)) if len(cumulative) else 0.0,
+            }
+        buy_returns = [float(fold_returns[j]) for j, probability in enumerate(probabilities) if probability >= BUY_THRESHOLD]
+        pnl_values = [value * STAKE_USDT for value in buy_returns]
+        cumulative = np.cumsum([0.0] + pnl_values)
+        max_drawdown = float(np.max(np.maximum.accumulate(cumulative) - cumulative)) if len(cumulative) else 0.0
         predictions.append({
             "fold": fold + 1,
             "train_count": int(len(train)),
@@ -74,6 +90,8 @@ def evaluate_feature_set(usable, features, fold_count=3):
                 float(np.mean(buy_returns) * 100) if buy_returns else None
             ),
             "fixed_stake_net_pnl_usdt": float(np.sum(buy_returns) * STAKE_USDT),
+            "max_drawdown_usdt": max_drawdown,
+            "threshold_diagnostics": threshold_diagnostics,
         })
 
     if not predictions:
@@ -103,6 +121,15 @@ def evaluate_feature_set(usable, features, fold_count=3):
         "buy_signal_count": int(total_buys),
         "average_net_buy_return_percent": average_buy_return,
         "fixed_stake_net_pnl_usdt": float(pnl),
+        "max_fold_drawdown_usdt": float(max(item["max_drawdown_usdt"] for item in predictions)),
+        "threshold_diagnostics": {
+            threshold: {
+                "buy_signal_count": int(sum(item["threshold_diagnostics"][threshold]["buy_signal_count"] for item in predictions)),
+                "net_pnl_usdt": float(sum(item["threshold_diagnostics"][threshold]["net_pnl_usdt"] for item in predictions)),
+                "max_fold_drawdown_usdt": float(max(item["threshold_diagnostics"][threshold]["max_drawdown_usdt"] for item in predictions)),
+            }
+            for threshold in ("0.55", "0.58", "0.62")
+        },
     }
 
 
@@ -140,11 +167,11 @@ def compare_feature_sets(candles, fold_count=3):
         "symbol": "BTCUSDT",
         "interval": "5m",
         "usable_candle_count": int(len(usable)),
-        "method": "Expanding chronological training windows; test windows occur strictly after training. Fixed BUY threshold 0.58; estimated 0.10% fee and 0.05% slippage per side; fixed 10 USDT stake.",
+        "method": "Expanding chronological training windows; test windows occur strictly after training. Reports BUY thresholds 0.55, 0.58, and 0.62 as diagnostics only; estimated 0.10% fee and 0.05% slippage per side; fixed 10 USDT stake.",
         "baseline_features": baseline,
         "expanded_features": expanded,
         "comparison": comparison,
-        "interpretation": "Research comparison only. Results are noisy, threshold is not tuned on these test folds, and positive results are not proof of future profitability.",
+        "interpretation": "Research comparison only. Results are noisy, threshold diagnostics are not used to select a threshold, and positive results are not proof of future profitability.",
         "real_money_trading_eligible": False,
         "orders_sent": False,
     }
