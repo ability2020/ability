@@ -135,6 +135,7 @@ def compare_feature_sets(candles, fold_count=3):
         }
     return {
         "report_type": "chronological-feature-ablation",
+        "available": bool(baseline.get("available") and expanded.get("available")),
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "symbol": "BTCUSDT",
         "interval": "5m",
