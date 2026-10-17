@@ -163,6 +163,7 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
     stop_level_touch_candles = 0
     target_level_touch_candles = 0
     both_levels_touch_candles = 0
+    stop_gap_candles = 0
 
     # Walk every candle, not only candles with a prediction. A missing signal
     # must never skip an OHLC stop/target check for an open position.
@@ -175,6 +176,7 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
             entry = position["entry_price"]
             stop_price = entry * (1.0 - stop_loss_percent / 100.0)
             target_price = entry * (1.0 + take_profit_percent / 100.0)
+            open_price = float(row["open"])
             low = float(row["low"])
             high = float(row["high"])
             checked_position_candles += 1
@@ -184,6 +186,8 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
             target_touched = high >= target_price
             if stop_touched:
                 stop_level_touch_candles += 1
+                if open_price <= stop_price:
+                    stop_gap_candles += 1
             if target_touched:
                 target_level_touch_candles += 1
             if stop_touched and target_touched:
@@ -191,7 +195,10 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
             exit_price = None
             exit_reason = None
             if stop_touched:
-                exit_price, exit_reason = stop_price, "STOP_LOSS"
+                # If the candle opens through the stop, assume execution at the
+                # open (worse than the stop trigger), not at an unavailable price.
+                exit_price = min(stop_price, open_price)
+                exit_reason = "STOP_LOSS"
             elif target_touched:
                 exit_price, exit_reason = target_price, "TAKE_PROFIT"
             elif signal == "SELL":
@@ -256,6 +263,7 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
         "position_strategy_stop_level_touch_candle_count": stop_level_touch_candles,
         "position_strategy_target_level_touch_candle_count": target_level_touch_candles,
         "position_strategy_both_levels_touch_candle_count": both_levels_touch_candles,
+        "position_strategy_stop_gap_candle_count": stop_gap_candles,
         "position_strategy_exit_price_sample": [
             {
                 "entry_timestamp": trade["entry_timestamp"],
@@ -282,7 +290,8 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
             "Long-only Spot simulation, one position at a time. Entry at signal candle close; "
             "every later candle OHLC is checked for stop-loss/take-profit even if a prediction "
             "is missing. If both stop and target are touched in one candle, stop-loss is assumed "
-            "first. Estimated fees/slippage included; no account balance, exchange execution, or orders."
+            "first. A candle opening below the stop is filled at its open, not the stop level. "
+            "Estimated fees/slippage included; no account balance, exchange execution, or orders."
         ),
     }
 
