@@ -47,6 +47,7 @@ class PaperTradingTests(unittest.TestCase):
         )
         self.assertEqual(event, "PAPER_SELL")
         self.assertIn("TAKE_PROFIT", reason)
+        self.assertIsNone(state["position"])
         self.assertAlmostEqual(state["realized_pnl_usdt"], 0.3)
 
     def test_sell_signal_closes_only_an_existing_position(self):
@@ -72,7 +73,6 @@ class PaperTradingTests(unittest.TestCase):
         self.assertAlmostEqual(state["position"]["entry_price"], 100.0)
 
     def test_complete_paper_cycle_records_one_closed_trade(self):
-        # Full offline lifecycle: buy, hold, then close on a SELL signal.
         state, event, _ = paper_trader.process_cycle(
             paper_trader.default_state(), "BUY", 100.0, 10.0, 2.0, 3.0
         )
@@ -115,6 +115,44 @@ class PaperTradingTests(unittest.TestCase):
         Path(self.path).write_text("{broken", encoding="utf-8")
         with self.assertRaises(RuntimeError):
             paper_trader.load_state(self.path)
+
+    def test_restored_position_triggers_stop_loss_after_reload(self):
+        state, event, _ = paper_trader.process_cycle(
+            paper_trader.default_state(), "BUY", 100.0, 10.0, 2.0, 3.0
+        )
+        self.assertEqual(event, "PAPER_BUY")
+        paper_trader.save_state(state, self.path)
+
+        # A new workflow cycle reloads the persisted position from disk/cache.
+        restored = paper_trader.load_state(self.path)
+        self.assertIsNotNone(restored["position"])
+        self.assertAlmostEqual(restored["position"]["entry_price"], 100.0)
+
+        updated, event, reason = paper_trader.process_cycle(
+            restored, "WAIT", 98.0, 10.0, 2.0, 3.0
+        )
+        self.assertEqual(event, "PAPER_SELL")
+        self.assertIn("STOP_LOSS", reason)
+        self.assertIsNone(updated["position"])
+        self.assertEqual(len(updated["closed_trades"]), 1)
+        self.assertAlmostEqual(updated["realized_pnl_usdt"], -0.2)
+
+    def test_restored_position_triggers_take_profit_after_reload(self):
+        state, event, _ = paper_trader.process_cycle(
+            paper_trader.default_state(), "BUY", 100.0, 10.0, 2.0, 3.0
+        )
+        self.assertEqual(event, "PAPER_BUY")
+        paper_trader.save_state(state, self.path)
+
+        restored = paper_trader.load_state(self.path)
+        updated, event, reason = paper_trader.process_cycle(
+            restored, "WAIT", 103.0, 10.0, 2.0, 3.0
+        )
+        self.assertEqual(event, "PAPER_SELL")
+        self.assertIn("TAKE_PROFIT", reason)
+        self.assertIsNone(updated["position"])
+        self.assertEqual(len(updated["closed_trades"]), 1)
+        self.assertAlmostEqual(updated["realized_pnl_usdt"], 0.3)
 
     def test_invalid_market_data_is_rejected(self):
         for price in (0, -1, float("nan"), float("inf")):
