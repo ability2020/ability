@@ -128,27 +128,44 @@ def evaluate_research_gate(prediction_count, buy_count, average_buy_return, aver
 
 
 def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_profit_percent=3.0):
-    """Simulate one long Spot position at a time using OHLC stop/target exits.
+    """Simulate one long Spot position using every subsequent candle's OHLC.
 
-    Entries use the signal candle close; exits are checked on later candles.
-    If stop-loss and take-profit are both touched in one candle, assume the
-    stop-loss happens first (conservative). Includes estimated fees/slippage.
-    This is research-only and never sends orders.
+    Entries use the signal candle close; exits are checked on every later candle,
+    even if a prediction is absent for that candle. If stop-loss and take-profit
+    are both touched, stop-loss is assumed first. No exchange orders are sent.
     """
-    if not (0 < float(stop_loss_percent) < 100 and float(take_profit_percent) > 0):
-        raise ValueError("Stop loss must be in (0, 100) and take profit must be positive.")
+    try:
+        stop_loss_percent = float(stop_loss_percent)
+        take_profit_percent = float(take_profit_percent)
+    except (TypeError, ValueError) as error:
+        raise ValueError("Stop loss and take profit must be numeric.") from error
+    if not (
+        np.isfinite(stop_loss_percent)
+        and np.isfinite(take_profit_percent)
+        and 0 < stop_loss_percent < 100
+        and take_profit_percent > 0
+    ):
+        raise ValueError("Stop loss must be finite and in (0, 100); take profit must be positive and finite.")
+
     index_by_timestamp = {
         int(row["timestamp"]): idx for idx, (_, row) in enumerate(usable.iterrows())
     }
     signal_by_index = {
         index_by_timestamp[int(pred["timestamp"])]: pred["signal"]
-        for pred in predictions if int(pred["timestamp"]) in index_by_timestamp
+        for pred in predictions
+        if int(pred["timestamp"]) in index_by_timestamp
+        and pred.get("signal") in ("BUY", "SELL", "WAIT")
     }
     position = None
     trades = []
-    for i in sorted(signal_by_index):
+
+    # Walk every candle, not only candles with a prediction. A missing signal
+    # must never skip an OHLC stop/target check for an open position.
+    for i in range(len(usable)):
         row = usable.iloc[i]
-        signal = signal_by_index[i]
+        signal = signal_by_index.get(i)
+        exited_this_candle = False
+
         if position is not None and i > position["entry_index"]:
             entry = position["entry_price"]
             stop_price = entry * (1.0 - stop_loss_percent / 100.0)
@@ -163,6 +180,7 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
                 exit_price, exit_reason = target_price, "TAKE_PROFIT"
             elif signal == "SELL":
                 exit_price, exit_reason = float(row["close"]), "SELL_SIGNAL"
+
             if exit_price is not None:
                 exit_execution = exit_price * (1.0 - SLIPPAGE_RATE)
                 proceeds = position["quantity"] * exit_execution * (1.0 - FEE_RATE)
@@ -177,7 +195,11 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
                     "exit_reason": exit_reason,
                 })
                 position = None
-        if position is None and signal == "BUY":
+                exited_this_candle = True
+
+        # Avoid an ambiguous stop/target exit followed by a new entry on the
+        # same candle. New entries are considered at candle close only.
+        if position is None and signal == "BUY" and not exited_this_candle:
             entry_reference = float(row["close"])
             entry_execution = entry_reference * (1.0 + SLIPPAGE_RATE)
             position = {
@@ -189,7 +211,9 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
             }
 
     if position is not None:
-        row = usable.iloc[max(signal_by_index)]
+        # Mark any remaining position at the final available candle, including
+        # candles for which no prediction was produced.
+        row = usable.iloc[-1]
         exit_price = float(row["close"])
         exit_execution = exit_price * (1.0 - SLIPPAGE_RATE)
         proceeds = position["quantity"] * exit_execution * (1.0 - FEE_RATE)
@@ -206,10 +230,9 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
 
     total_pnl = float(sum(trade["pnl_usdt"] for trade in trades))
     return {
-        # Explicitly research-only: this simulation can never approve real-money trading.
         "real_money_trading_eligible": False,
-        "position_strategy_stop_loss_percent": float(stop_loss_percent),
-        "position_strategy_take_profit_percent": float(take_profit_percent),
+        "position_strategy_stop_loss_percent": stop_loss_percent,
+        "position_strategy_take_profit_percent": take_profit_percent,
         "position_strategy_trade_count": len(trades),
         "position_strategy_closed_trade_pnl_usdt": total_pnl,
         "position_strategy_average_net_return_percent_per_trade": (
@@ -225,9 +248,9 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
         "position_strategy_trades_sample": trades[-20:],
         "position_strategy_method": (
             "Long-only Spot simulation, one position at a time. Entry at signal candle close; "
-            "later candle OHLC checks stop-loss/take-profit before SELL signal. If both stop "
-            "and target are touched in one candle, stop-loss is assumed first. Estimated "
-            "fees/slippage included; no account balance, exchange execution, or orders."
+            "every later candle OHLC is checked for stop-loss/take-profit even if a prediction "
+            "is missing. If both stop and target are touched in one candle, stop-loss is assumed "
+            "first. Estimated fees/slippage included; no account balance, exchange execution, or orders."
         ),
     }
 

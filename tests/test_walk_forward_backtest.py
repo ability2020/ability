@@ -81,6 +81,62 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertLess(result["position_strategy_closed_trade_pnl_usdt"], 0)
         self.assertFalse(result.get("real_money_trading_eligible", True))
 
+    def test_position_strategy_uses_take_profit_ohlc_touch(self):
+        import pandas as pd
+
+        usable = pd.DataFrame([
+            {"timestamp": 1, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+            # Target is 103; the candle touches it even though it closes below it.
+            {"timestamp": 2, "open": 100.0, "high": 104.0, "low": 99.0, "close": 101.0},
+        ])
+        result = walk_forward_backtest.simulate_position_strategy(
+            usable,
+            [{"timestamp": 1, "signal": "BUY"}, {"timestamp": 2, "signal": "WAIT"}],
+            stop_loss_percent=2.0,
+            take_profit_percent=3.0,
+        )
+        self.assertEqual(result["position_strategy_exit_reasons"]["TAKE_PROFIT"], 1)
+        trade = result["position_strategy_trades_sample"][0]
+        self.assertAlmostEqual(trade["exit_price"], 103.0)
+        self.assertEqual(trade["exit_reason"], "TAKE_PROFIT")
+        self.assertFalse(result["real_money_trading_eligible"])
+
+    def test_position_strategy_checks_ohlc_when_prediction_is_missing(self):
+        import pandas as pd
+
+        usable = pd.DataFrame([
+            {"timestamp": 1, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+            # No prediction for timestamp 2; the stop must still trigger.
+            {"timestamp": 2, "open": 100.0, "high": 100.5, "low": 97.0, "close": 99.0},
+            {"timestamp": 3, "open": 99.0, "high": 100.0, "low": 98.0, "close": 99.5},
+        ])
+        result = walk_forward_backtest.simulate_position_strategy(
+            usable,
+            [{"timestamp": 1, "signal": "BUY"}, {"timestamp": 3, "signal": "WAIT"}],
+            stop_loss_percent=2.0,
+            take_profit_percent=3.0,
+        )
+        self.assertEqual(result["position_strategy_exit_reasons"]["STOP_LOSS"], 1)
+        self.assertEqual(result["position_strategy_exit_reasons"]["END_OF_TEST"], 0)
+        self.assertAlmostEqual(result["position_strategy_trades_sample"][0]["exit_price"], 98.0)
+
+    def test_position_strategy_stop_loss_wins_if_both_levels_touched(self):
+        import pandas as pd
+
+        usable = pd.DataFrame([
+            {"timestamp": 1, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+            {"timestamp": 2, "open": 100.0, "high": 105.0, "low": 97.0, "close": 102.0},
+        ])
+        result = walk_forward_backtest.simulate_position_strategy(
+            usable,
+            [{"timestamp": 1, "signal": "BUY"}, {"timestamp": 2, "signal": "WAIT"}],
+            stop_loss_percent=2.0,
+            take_profit_percent=3.0,
+        )
+        self.assertEqual(result["position_strategy_exit_reasons"]["STOP_LOSS"], 1)
+        self.assertEqual(result["position_strategy_exit_reasons"]["TAKE_PROFIT"], 0)
+        self.assertAlmostEqual(result["position_strategy_trades_sample"][0]["exit_price"], 98.0)
+
     def test_position_strategy_does_not_enter_on_sell_or_wait(self):
         import pandas as pd
 
