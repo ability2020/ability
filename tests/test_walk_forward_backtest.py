@@ -229,6 +229,33 @@ class WalkForwardBacktestTests(unittest.TestCase):
             walk_forward_backtest.walk_forward_evaluate(make_candles(80))
 
 
+    def test_position_strategy_reports_gross_pnl_and_cost_breakdown(self):
+        import pandas as pd
+
+        usable = pd.DataFrame([
+            {"timestamp": 1, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+            {"timestamp": 2, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+        ])
+        result = walk_forward_backtest.simulate_position_strategy(
+            usable,
+            [{"timestamp": 1, "signal": "BUY"}, {"timestamp": 2, "signal": "SELL"}],
+        )
+        trade = result["position_strategy_trades_sample"][0]
+        self.assertAlmostEqual(trade["gross_price_pnl_usdt"], 0.0, places=10)
+        self.assertGreater(trade["estimated_total_costs_usdt"], 0.0)
+        self.assertAlmostEqual(
+            trade["pnl_usdt"],
+            trade["gross_price_pnl_usdt"] - trade["estimated_total_costs_usdt"],
+            places=10,
+        )
+        self.assertAlmostEqual(
+            result["position_strategy_closed_trade_pnl_usdt"],
+            result["position_strategy_gross_price_pnl_usdt"]
+            - result["position_strategy_estimated_total_costs_usdt"],
+            places=10,
+        )
+        self.assertFalse(result["real_money_trading_eligible"])
+
     def test_position_strategy_stop_loss_gap_fills_at_candle_open(self):
         import pandas as pd
 
