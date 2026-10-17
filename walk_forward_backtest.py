@@ -464,7 +464,8 @@ def walk_forward_evaluate(candles):
         average_market_return, fixed_stake_pnl_usdt,
     )
     position_strategy = simulate_position_strategy(usable, predictions)
-    holding_period_analysis = analyze_holding_periods(usable, predictions)\n    net_total_return = float(np.prod([1.0 + r for r in trade_returns]) - 1.0) if trade_returns else 0.0
+    holding_period_analysis = analyze_holding_periods(usable, predictions)
+    net_total_return = float(np.prod([1.0 + r for r in trade_returns]) - 1.0) if trade_returns else 0.0
     baseline_total_return = float(np.prod([1.0 + r for r in baseline_returns]) - 1.0)
     return {
         "report_type": "experimental-walk-forward-model-evaluation",
@@ -525,7 +526,8 @@ def walk_forward_evaluate(candles):
             "Threshold tuning uses only each fold's training period and rejects candidate thresholds without positive average validation return after estimated costs, but repeated comparisons can still overfit; validate across more symbols and later unseen periods before any live use.",
         ],
         "probability_band_after_cost_analysis": summarize_probability_bands(predictions),
-        "holding_period_cost_analysis": holding_period_analysis,\n        "sample_predictions": predictions[-10:],
+        "holding_period_cost_analysis": holding_period_analysis,
+        "sample_predictions": predictions[-10:],
     }
 
 
