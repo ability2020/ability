@@ -316,6 +316,56 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
         ),
     }
 
+
+def summarize_probability_bands(predictions):
+    """Summarize out-of-sample prediction quality by probability band after costs."""
+    bands = [
+        ("below_0_45", 0.0, 0.45),
+        ("0_45_to_0_50", 0.45, 0.50),
+        ("0_50_to_0_55", 0.50, 0.55),
+        ("0_55_to_0_60", 0.55, 0.60),
+        ("0_60_to_0_65", 0.60, 0.65),
+        ("0_65_and_above", 0.65, 1.0000000001),
+    ]
+    summaries = []
+    for label, lower, upper in bands:
+        selected = [
+            row for row in predictions
+            if lower <= float(row["probability_up"]) < upper
+        ]
+        net_returns = [float(row["net_return_fraction"]) for row in selected]
+        summaries.append({
+            "probability_band": label,
+            "probability_lower_inclusive": lower,
+            "probability_upper_exclusive": upper,
+            "prediction_count": len(selected),
+            "directional_accuracy": (
+                float(np.mean([
+                    bool(row["actual_next_close_up"]) == (float(row["probability_up"]) >= 0.5)
+                    for row in selected
+                ])) if selected else None
+            ),
+            "average_next_candle_gross_return_percent": (
+                float(np.mean([float(row["next_close_return_fraction"]) for row in selected]) * 100.0)
+                if selected else None
+            ),
+            "average_next_candle_net_return_percent_after_costs": (
+                float(np.mean(net_returns) * 100.0) if net_returns else None
+            ),
+            "fixed_stake_net_pnl_usdt": float(sum(net_returns) * STAKE_USDT),
+            "profitable_prediction_count_after_costs": sum(value > 0 for value in net_returns),
+            "real_money_trading_eligible": False,
+        })
+    return {
+        "method": (
+            "Descriptive grouping of chronological out-of-sample predictions. Bands are not "
+            "selected using test outcomes; returns represent one-candle hypothetical fixed-stake "
+            "trades with estimated entry/exit fees and slippage. Small band counts are noisy."
+        ),
+        "bands": summaries,
+        "real_money_trading_eligible": False,
+    }
+
 def walk_forward_evaluate(candles):
     _validate_settings()
     frame = build_feature_frame(candles)
@@ -384,12 +434,19 @@ def walk_forward_evaluate(candles):
         baseline_returns.append(_net_one_candle_return(
             float(usable.iloc[i]["close"]), float(usable.iloc[i + 1]["close"])
         ))
+        next_close_return_fraction = (
+            float(usable.iloc[i + 1]["close"]) / float(current.iloc[0]["close"]) - 1.0
+        )
         predictions.append({
             "timestamp": int(current.iloc[0]["timestamp"]),
             "close": float(current.iloc[0]["close"]),
             "probability_up": probability_up,
             "signal": signal,
             "actual_next_close_up": bool(actual_up),
+            "next_close_return_fraction": next_close_return_fraction,
+            "net_return_fraction": _net_one_candle_return(
+                float(current.iloc[0]["close"]), float(usable.iloc[i + 1]["close"])
+            ),
         })
 
     if len(predictions) < 20:
@@ -467,6 +524,7 @@ def walk_forward_evaluate(candles):
             "No exchange account is accessed and no orders are submitted.",
             "Threshold tuning uses only each fold's training period and rejects candidate thresholds without positive average validation return after estimated costs, but repeated comparisons can still overfit; validate across more symbols and later unseen periods before any live use.",
         ],
+        "probability_band_after_cost_analysis": summarize_probability_bands(predictions),
         "sample_predictions": predictions[-10:],
     }
 
