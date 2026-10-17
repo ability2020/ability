@@ -18,6 +18,7 @@ from learning_model import (
     FEATURE_COLUMNS,
     INTERVAL,
     MIN_SAMPLES,
+    MODEL_VERSION,
     SYMBOL,
     build_feature_frame,
     fetch_candles,
@@ -326,7 +327,7 @@ def walk_forward_evaluate(candles):
     baseline_total_return = float(np.prod([1.0 + r for r in baseline_returns]) - 1.0)
     return {
         "report_type": "experimental-walk-forward-model-evaluation",
-        "model_version": "logistic-direction-v1",
+        "model_version": MODEL_VERSION,
         "symbol": SYMBOL,
         "interval": INTERVAL,
         "candle_count_with_features": int(len(usable)),
@@ -424,8 +425,8 @@ def evaluate_multiple_unseen_periods(candles, period_count=3):
         average_buy = report["buy_only_average_net_return_percent_per_trade"]
         average_market = report["all_test_candles_average_net_return_percent"]
         checks = {
-            "enough_walk_forward_predictions": report["walk_forward_prediction_count"] >= 50,
-            "enough_buy_signals": report["buy_signal_count"] >= 5,
+            "enough_walk_forward_predictions": report["walk_forward_prediction_count"] >= 100,
+            "enough_buy_signals": report["buy_signal_count"] >= 10,
             "positive_average_net_buy_return": average_buy is not None and average_buy > 0.0,
             "buy_returns_beat_all_candles_after_costs": (
                 average_buy is not None and average_market is not None and average_buy > average_market
@@ -475,6 +476,17 @@ def evaluate_multiple_unseen_periods(candles, period_count=3):
     tuned_threshold_wins = sum(period["tuned_threshold_beats_fixed_threshold_after_costs"] for period in period_reports)
     return {
         "report_type": "experimental-multi-period-walk-forward-evaluation",
+        "model_version": MODEL_VERSION,
+        "research_gate_policy": {
+            "required_chronological_periods": int(period_count),
+            "minimum_predictions_per_period": 100,
+            "minimum_buy_signals_per_period": 10,
+            "requires_positive_average_net_buy_return_after_estimated_costs": True,
+            "requires_buy_returns_to_beat_same_period_all_candle_benchmark_after_costs": True,
+            "requires_positive_fixed_stake_pnl_in_every_period": True,
+            "all_periods_must_pass": True,
+            "real_money_trading_eligible_when_passed": False,
+        },
         "multi_period_evaluation_available": True,
         "period_count_requested": period_count,
         "period_count_evaluated": len(period_reports),
