@@ -137,6 +137,49 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertEqual(result["position_strategy_exit_reasons"]["TAKE_PROFIT"], 0)
         self.assertAlmostEqual(result["position_strategy_trades_sample"][0]["exit_price"], 98.0)
 
+
+    def test_position_strategy_reports_touch_counts_exit_prices_and_net_pnl(self):
+        import pandas as pd
+
+        usable = pd.DataFrame([
+            {"timestamp": 1, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+            # Both levels touched: stop is the assumed exit, but both touches are counted.
+            {"timestamp": 2, "open": 100.0, "high": 104.0, "low": 97.0, "close": 101.0},
+        ])
+        result = walk_forward_backtest.simulate_position_strategy(
+            usable,
+            [{"timestamp": 1, "signal": "BUY"}],
+            stop_loss_percent=2.0,
+            take_profit_percent=3.0,
+        )
+        self.assertEqual(result["position_strategy_checked_open_position_candles"], 1)
+        self.assertEqual(result["position_strategy_missing_prediction_candles_checked"], 1)
+        self.assertEqual(result["position_strategy_stop_level_touch_candle_count"], 1)
+        self.assertEqual(result["position_strategy_target_level_touch_candle_count"], 1)
+        self.assertEqual(result["position_strategy_both_levels_touch_candle_count"], 1)
+        self.assertAlmostEqual(result["position_strategy_exit_price_sample"][0]["exit_price"], 98.0)
+        self.assertLess(result["position_strategy_exit_price_sample"][0]["net_pnl_usdt"], 0.0)
+
+    def test_position_strategy_closes_remaining_position_at_end_of_test(self):
+        import pandas as pd
+
+        usable = pd.DataFrame([
+            {"timestamp": 1, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+            {"timestamp": 2, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.5},
+            {"timestamp": 3, "open": 100.5, "high": 101.0, "low": 100.0, "close": 100.25},
+        ])
+        result = walk_forward_backtest.simulate_position_strategy(
+            usable,
+            [{"timestamp": 1, "signal": "BUY"}, {"timestamp": 2, "signal": "WAIT"}],
+        )
+        self.assertEqual(result["position_strategy_trade_count"], 1)
+        self.assertEqual(result["position_strategy_exit_reasons"]["END_OF_TEST"], 1)
+        trade = result["position_strategy_exit_price_sample"][0]
+        self.assertEqual(trade["exit_timestamp"], 3)
+        self.assertAlmostEqual(trade["exit_price"], 100.25)
+        self.assertTrue(np.isfinite(trade["net_pnl_usdt"]))
+        self.assertFalse(result["real_money_trading_eligible"])
+
     def test_position_strategy_does_not_enter_on_sell_or_wait(self):
         import pandas as pd
 
