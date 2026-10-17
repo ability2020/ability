@@ -229,5 +229,27 @@ class WalkForwardBacktestTests(unittest.TestCase):
             walk_forward_backtest.walk_forward_evaluate(make_candles(80))
 
 
+    def test_position_strategy_stop_loss_gap_fills_at_candle_open(self):
+        import pandas as pd
+
+        usable = pd.DataFrame([
+            {"timestamp": 1, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+            # Stop trigger is 98, but the next candle opens at 95: assume the
+            # stop executes at 95 rather than pretending a 98 fill was available.
+            {"timestamp": 2, "open": 95.0, "high": 96.0, "low": 94.0, "close": 95.5},
+        ])
+        result = walk_forward_backtest.simulate_position_strategy(
+            usable,
+            [{"timestamp": 1, "signal": "BUY"}, {"timestamp": 2, "signal": "WAIT"}],
+            stop_loss_percent=2.0,
+            take_profit_percent=3.0,
+        )
+        trade = result["position_strategy_trades_sample"][0]
+        self.assertEqual(trade["exit_reason"], "STOP_LOSS")
+        self.assertAlmostEqual(trade["exit_price"], 95.0)
+        self.assertEqual(result["position_strategy_stop_gap_candle_count"], 1)
+        self.assertFalse(result["real_money_trading_eligible"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
