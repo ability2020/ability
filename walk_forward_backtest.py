@@ -648,6 +648,7 @@ def evaluate_multiple_unseen_periods(candles, period_count=3):
 
 
 def analyze_holding_periods(usable, predictions, holding_periods=(1, 3, 6, 12)):
+    # Research-only diagnostic: never authorizes live order placement.
     """Compare fixed holding horizons using only chronological out-of-sample BUY signals.
 
     Trades are non-overlapping within each horizon. Each position enters at the
