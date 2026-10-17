@@ -127,6 +127,34 @@ def evaluate_research_gate(prediction_count, buy_count, average_buy_return, aver
 
 
 
+
+def _position_trade_with_cost_breakdown(position, exit_price, exit_execution, exit_reason, exit_timestamp):
+    """Build one simulated trade and reconcile price PnL with estimated costs."""
+    quantity = position["quantity"]
+    entry_price = position["entry_price"]
+    entry_execution = position["entry_execution"]
+    entry_fee = position["entry_fee"]
+    exit_fee = quantity * exit_execution * FEE_RATE
+    entry_slippage = quantity * (entry_execution - entry_price)
+    exit_slippage = quantity * (exit_price - exit_execution)
+    gross_price_pnl = quantity * (exit_price - entry_price)
+    net_pnl = gross_price_pnl - entry_slippage - exit_slippage - entry_fee - exit_fee
+    return {
+        "entry_timestamp": position["entry_timestamp"],
+        "exit_timestamp": int(exit_timestamp),
+        "entry_price": entry_price,
+        "exit_price": float(exit_price),
+        "exit_reason": exit_reason,
+        "gross_price_pnl_usdt": float(gross_price_pnl),
+        "estimated_entry_fee_usdt": float(entry_fee),
+        "estimated_exit_fee_usdt": float(exit_fee),
+        "estimated_entry_slippage_usdt": float(entry_slippage),
+        "estimated_exit_slippage_usdt": float(exit_slippage),
+        "estimated_total_costs_usdt": float(entry_fee + exit_fee + entry_slippage + exit_slippage),
+        "pnl_usdt": float(net_pnl),
+        "net_return_percent": float(net_pnl / STAKE_USDT * 100.0),
+    }
+
 def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_profit_percent=3.0):
     """Simulate one long Spot position using every subsequent candle's OHLC.
 
@@ -206,17 +234,9 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
 
             if exit_price is not None:
                 exit_execution = exit_price * (1.0 - SLIPPAGE_RATE)
-                proceeds = position["quantity"] * exit_execution * (1.0 - FEE_RATE)
-                pnl = proceeds - STAKE_USDT - position["entry_fee"]
-                trades.append({
-                    "entry_timestamp": position["entry_timestamp"],
-                    "exit_timestamp": int(row["timestamp"]),
-                    "entry_price": position["entry_price"],
-                    "exit_price": exit_price,
-                    "pnl_usdt": float(pnl),
-                    "net_return_percent": float(pnl / STAKE_USDT * 100.0),
-                    "exit_reason": exit_reason,
-                })
+                trades.append(_position_trade_with_cost_breakdown(
+                    position, exit_price, exit_execution, exit_reason, row["timestamp"]
+                ))
                 position = None
                 exited_this_candle = True
 
@@ -229,6 +249,7 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
                 "entry_index": i,
                 "entry_timestamp": int(row["timestamp"]),
                 "entry_price": entry_reference,
+                "entry_execution": entry_execution,
                 "quantity": STAKE_USDT / entry_execution,
                 "entry_fee": STAKE_USDT * FEE_RATE,
             }
@@ -239,17 +260,9 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
         row = usable.iloc[-1]
         exit_price = float(row["close"])
         exit_execution = exit_price * (1.0 - SLIPPAGE_RATE)
-        proceeds = position["quantity"] * exit_execution * (1.0 - FEE_RATE)
-        pnl = proceeds - STAKE_USDT - position["entry_fee"]
-        trades.append({
-            "entry_timestamp": position["entry_timestamp"],
-            "exit_timestamp": int(row["timestamp"]),
-            "entry_price": position["entry_price"],
-            "exit_price": exit_price,
-            "pnl_usdt": float(pnl),
-            "net_return_percent": float(pnl / STAKE_USDT * 100.0),
-            "exit_reason": "END_OF_TEST",
-        })
+        trades.append(_position_trade_with_cost_breakdown(
+            position, exit_price, exit_execution, "END_OF_TEST", row["timestamp"]
+        ))
 
     total_pnl = float(sum(trade["pnl_usdt"] for trade in trades))
     return {
@@ -258,6 +271,12 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
         "position_strategy_take_profit_percent": take_profit_percent,
         "position_strategy_trade_count": len(trades),
         "position_strategy_closed_trade_pnl_usdt": total_pnl,
+        "position_strategy_gross_price_pnl_usdt": float(sum(trade["gross_price_pnl_usdt"] for trade in trades)),
+        "position_strategy_estimated_entry_fees_usdt": float(sum(trade["estimated_entry_fee_usdt"] for trade in trades)),
+        "position_strategy_estimated_exit_fees_usdt": float(sum(trade["estimated_exit_fee_usdt"] for trade in trades)),
+        "position_strategy_estimated_entry_slippage_usdt": float(sum(trade["estimated_entry_slippage_usdt"] for trade in trades)),
+        "position_strategy_estimated_exit_slippage_usdt": float(sum(trade["estimated_exit_slippage_usdt"] for trade in trades)),
+        "position_strategy_estimated_total_costs_usdt": float(sum(trade["estimated_total_costs_usdt"] for trade in trades)),
         "position_strategy_checked_open_position_candles": checked_position_candles,
         "position_strategy_missing_prediction_candles_checked": missing_prediction_position_candles,
         "position_strategy_stop_level_touch_candle_count": stop_level_touch_candles,
@@ -272,6 +291,8 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
                 "exit_price": trade["exit_price"],
                 "exit_reason": trade["exit_reason"],
                 "net_pnl_usdt": trade["pnl_usdt"],
+                "gross_price_pnl_usdt": trade["gross_price_pnl_usdt"],
+                "estimated_total_costs_usdt": trade["estimated_total_costs_usdt"],
             }
             for trade in trades[-20:]
         ],
