@@ -158,6 +158,11 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
     }
     position = None
     trades = []
+    checked_position_candles = 0
+    missing_prediction_position_candles = 0
+    stop_level_touch_candles = 0
+    target_level_touch_candles = 0
+    both_levels_touch_candles = 0
 
     # Walk every candle, not only candles with a prediction. A missing signal
     # must never skip an OHLC stop/target check for an open position.
@@ -172,11 +177,22 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
             target_price = entry * (1.0 + take_profit_percent / 100.0)
             low = float(row["low"])
             high = float(row["high"])
+            checked_position_candles += 1
+            if i not in signal_by_index:
+                missing_prediction_position_candles += 1
+            stop_touched = low <= stop_price
+            target_touched = high >= target_price
+            if stop_touched:
+                stop_level_touch_candles += 1
+            if target_touched:
+                target_level_touch_candles += 1
+            if stop_touched and target_touched:
+                both_levels_touch_candles += 1
             exit_price = None
             exit_reason = None
-            if low <= stop_price:
+            if stop_touched:
                 exit_price, exit_reason = stop_price, "STOP_LOSS"
-            elif high >= target_price:
+            elif target_touched:
                 exit_price, exit_reason = target_price, "TAKE_PROFIT"
             elif signal == "SELL":
                 exit_price, exit_reason = float(row["close"]), "SELL_SIGNAL"
@@ -235,6 +251,22 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
         "position_strategy_take_profit_percent": take_profit_percent,
         "position_strategy_trade_count": len(trades),
         "position_strategy_closed_trade_pnl_usdt": total_pnl,
+        "position_strategy_checked_open_position_candles": checked_position_candles,
+        "position_strategy_missing_prediction_candles_checked": missing_prediction_position_candles,
+        "position_strategy_stop_level_touch_candle_count": stop_level_touch_candles,
+        "position_strategy_target_level_touch_candle_count": target_level_touch_candles,
+        "position_strategy_both_levels_touch_candle_count": both_levels_touch_candles,
+        "position_strategy_exit_price_sample": [
+            {
+                "entry_timestamp": trade["entry_timestamp"],
+                "exit_timestamp": trade["exit_timestamp"],
+                "entry_price": trade["entry_price"],
+                "exit_price": trade["exit_price"],
+                "exit_reason": trade["exit_reason"],
+                "net_pnl_usdt": trade["pnl_usdt"],
+            }
+            for trade in trades[-20:]
+        ],
         "position_strategy_average_net_return_percent_per_trade": (
             float(np.mean([trade["net_return_percent"] for trade in trades])) if trades else None
         ),
