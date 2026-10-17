@@ -464,7 +464,7 @@ def walk_forward_evaluate(candles):
         average_market_return, fixed_stake_pnl_usdt,
     )
     position_strategy = simulate_position_strategy(usable, predictions)
-    net_total_return = float(np.prod([1.0 + r for r in trade_returns]) - 1.0) if trade_returns else 0.0
+    holding_period_analysis = analyze_holding_periods(usable, predictions)\n    net_total_return = float(np.prod([1.0 + r for r in trade_returns]) - 1.0) if trade_returns else 0.0
     baseline_total_return = float(np.prod([1.0 + r for r in baseline_returns]) - 1.0)
     return {
         "report_type": "experimental-walk-forward-model-evaluation",
@@ -525,7 +525,7 @@ def walk_forward_evaluate(candles):
             "Threshold tuning uses only each fold's training period and rejects candidate thresholds without positive average validation return after estimated costs, but repeated comparisons can still overfit; validate across more symbols and later unseen periods before any live use.",
         ],
         "probability_band_after_cost_analysis": summarize_probability_bands(predictions),
-        "sample_predictions": predictions[-10:],
+        "holding_period_cost_analysis": holding_period_analysis,\n        "sample_predictions": predictions[-10:],
     }
 
 
@@ -641,6 +641,82 @@ def evaluate_multiple_unseen_periods(candles, period_count=3):
         ),
         "real_money_trading_eligible": False,
         "note": "This report-only evaluation never enables live trading and never submits exchange orders.",
+    }
+
+
+
+def analyze_holding_periods(usable, predictions, holding_periods=(1, 3, 6, 12)):
+    """Compare fixed holding horizons using only chronological out-of-sample BUY signals.
+
+    Trades are non-overlapping within each horizon. Each position enters at the
+    signal candle close and exits at the close N candles later. Fees and slippage
+    are charged on both sides. This is a diagnostic, not a strategy selector.
+    """
+    index_by_timestamp = {
+        int(row["timestamp"]): idx for idx, (_, row) in enumerate(usable.iterrows())
+    }
+    buy_indices = sorted({
+        index_by_timestamp[int(pred["timestamp"])]
+        for pred in predictions
+        if pred.get("signal") == "BUY"
+        and int(pred["timestamp"]) in index_by_timestamp
+    })
+    summaries = []
+    for horizon in holding_periods:
+        if not isinstance(horizon, int) or horizon < 1:
+            raise ValueError("Holding periods must be positive integers.")
+        trades = []
+        next_available_index = 0
+        for entry_index in buy_indices:
+            exit_index = entry_index + horizon
+            if entry_index < next_available_index or exit_index >= len(usable):
+                continue
+            entry_price = float(usable.iloc[entry_index]["close"])
+            exit_price = float(usable.iloc[exit_index]["close"])
+            entry_execution = entry_price * (1.0 + SLIPPAGE_RATE)
+            exit_execution = exit_price * (1.0 - SLIPPAGE_RATE)
+            quantity = STAKE_USDT / entry_execution
+            entry_fee = STAKE_USDT * FEE_RATE
+            exit_fee = quantity * exit_execution * FEE_RATE
+            gross_pnl = quantity * (exit_price - entry_price)
+            entry_slippage = quantity * (entry_execution - entry_price)
+            exit_slippage = quantity * (exit_price - exit_execution)
+            total_costs = entry_fee + exit_fee + entry_slippage + exit_slippage
+            net_pnl = gross_pnl - total_costs
+            trades.append({
+                "entry_timestamp": int(usable.iloc[entry_index]["timestamp"]),
+                "exit_timestamp": int(usable.iloc[exit_index]["timestamp"]),
+                "holding_candles": horizon,
+                "gross_price_pnl_usdt": float(gross_pnl),
+                "estimated_total_costs_usdt": float(total_costs),
+                "net_pnl_usdt": float(net_pnl),
+                "net_return_percent": float(net_pnl / STAKE_USDT * 100.0),
+            })
+            next_available_index = exit_index
+        summaries.append({
+            "holding_period_candles": horizon,
+            "holding_period_minutes": horizon * (5 if INTERVAL == "5m" else 1),
+            "trade_count": len(trades),
+            "gross_price_pnl_usdt": float(sum(t["gross_price_pnl_usdt"] for t in trades)),
+            "estimated_total_costs_usdt": float(sum(t["estimated_total_costs_usdt"] for t in trades)),
+            "net_pnl_usdt": float(sum(t["net_pnl_usdt"] for t in trades)),
+            "average_net_return_percent_per_trade": (
+                float(np.mean([t["net_return_percent"] for t in trades])) if trades else None
+            ),
+            "profitable_trade_count": sum(t["net_pnl_usdt"] > 0 for t in trades),
+            "real_money_trading_eligible": False,
+            "sample_trades": trades[-10:],
+        })
+    return {
+        "report_type": "experimental-out-of-sample-holding-period-cost-analysis",
+        "method": (
+            "Uses only chronological walk-forward out-of-sample BUY signals. For each horizon, "
+            "trades are non-overlapping and exit at the close N candles after entry. Entry/exit "
+            "fees and slippage are included. No thresholds are tuned on these results; this "
+            "diagnostic does not authorize orders."
+        ),
+        "holding_periods": summaries,
+        "real_money_trading_eligible": False,
     }
 
 
