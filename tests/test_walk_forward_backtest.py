@@ -224,6 +224,26 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertFalse(report["multi_period_evaluation_available"])
         self.assertFalse(report["real_money_trading_eligible"])
 
+    def test_probability_band_diagnostics_include_after_cost_returns(self):
+        predictions = [
+            {"probability_up": 0.40, "actual_next_close_up": False,
+             "next_close_return_fraction": -0.002, "net_return_fraction": -0.003},
+            {"probability_up": 0.57, "actual_next_close_up": True,
+             "next_close_return_fraction": 0.004, "net_return_fraction": 0.003},
+            {"probability_up": 0.68, "actual_next_close_up": True,
+             "next_close_return_fraction": 0.006, "net_return_fraction": 0.005},
+        ]
+        result = walk_forward_backtest.summarize_probability_bands(predictions)
+        bands = {item["probability_band"]: item for item in result["bands"]}
+        self.assertEqual(bands["below_0_45"]["prediction_count"], 1)
+        self.assertEqual(bands["0_55_to_0_60"]["prediction_count"], 1)
+        self.assertAlmostEqual(
+            bands["0_55_to_0_60"]["average_next_candle_net_return_percent_after_costs"],
+            0.3,
+        )
+        self.assertEqual(bands["0_65_and_above"]["profitable_prediction_count_after_costs"], 1)
+        self.assertFalse(result["real_money_trading_eligible"])
+
     def test_rejects_too_little_data(self):
         with self.assertRaises(ValueError):
             walk_forward_backtest.walk_forward_evaluate(make_candles(80))
