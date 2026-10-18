@@ -378,3 +378,19 @@ class WalkForwardBacktestTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+    def test_bullish_regime_filter_comparison_uses_same_out_of_sample_buy_signals(self):
+        predictions = [
+            {"signal": "BUY", "net_return_fraction": 0.02, "sma_gap_20": 0.01},
+            {"signal": "BUY", "net_return_fraction": -0.01, "sma_gap_20": -0.02},
+            {"signal": "WAIT", "net_return_fraction": 0.03, "sma_gap_20": 0.02},
+            {"signal": "BUY", "net_return_fraction": 0.01, "sma_gap_20": 0.001},
+        ]
+        result = walk_forward_backtest.compare_bullish_regime_filter(predictions, stake_usdt=10.0)
+        self.assertEqual(result["baseline_fixed_threshold"]["buy_signal_count"], 3)
+        self.assertEqual(result["bullish_regime_filtered"]["buy_signal_count"], 2)
+        self.assertAlmostEqual(result["baseline_fixed_threshold"]["fixed_stake_pnl_usdt"], 0.2)
+        self.assertAlmostEqual(result["bullish_regime_filtered"]["fixed_stake_pnl_usdt"], 0.3)
+        self.assertTrue(result["same_out_of_sample_predictions"])
+        self.assertFalse(result["real_money_trading_eligible"])
