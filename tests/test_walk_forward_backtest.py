@@ -298,5 +298,34 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertFalse(result["real_money_trading_eligible"])
 
 
+    def test_holding_period_analysis_compares_non_overlapping_after_cost_returns(self):
+        import pandas as pd
+
+        usable = pd.DataFrame([
+            {"timestamp": i, "open": p, "high": p + 1, "low": p - 1, "close": p}
+            for i, p in enumerate([100.0, 101.0, 102.0, 103.0, 104.0, 105.0], start=1)
+        ])
+        predictions = [
+            {"timestamp": i, "signal": "BUY"}
+            for i in range(1, 6)
+        ]
+        result = walk_forward_backtest.analyze_holding_periods(
+            usable, predictions, holding_periods=(1, 2)
+        )
+        by_horizon = {item["holding_period_candles"]: item for item in result["holding_periods"]}
+        self.assertEqual(by_horizon[1]["trade_count"], 3)
+        self.assertEqual(by_horizon[2]["trade_count"], 2)
+        self.assertGreater(by_horizon[1]["estimated_total_costs_usdt"], 0)
+        self.assertGreater(by_horizon[2]["estimated_total_costs_usdt"], 0)
+        self.assertFalse(result["real_money_trading_eligible"])
+        self.assertTrue(all(not item["real_money_trading_eligible"] for item in result["holding_periods"]))
+        for item in result["holding_periods"]:
+            self.assertAlmostEqual(
+                item["net_pnl_usdt"],
+                item["gross_price_pnl_usdt"] - item["estimated_total_costs_usdt"],
+                places=8,
+            )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
