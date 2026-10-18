@@ -403,6 +403,46 @@ def summarize_probability_bands(predictions):
         "real_money_trading_eligible": False,
     }
 
+def compare_bullish_regime_filter(predictions, stake_usdt=STAKE_USDT):
+    """Compare fixed-threshold BUYs with the same BUYs filtered by a bullish SMA-gap regime.
+
+    The regime flag is derived from the current candle's sma_gap_20 feature, which
+    is available at the signal candle close. This is an exploratory filter, not
+    tuned on the outer test period and never authorizes exchange orders.
+    """
+    baseline = [p for p in predictions if p.get("signal") == "BUY"]
+    filtered = [p for p in baseline if p.get("sma_gap_20") is not None and float(p["sma_gap_20"]) > 0.0]
+
+    def summarize(rows):
+        returns = [float(p["net_return_fraction"]) for p in rows]
+        pnl = float(sum(returns) * float(stake_usdt))
+        drawdown = summarize_fixed_stake_drawdown(returns, stake_usdt)
+        return {
+            "buy_signal_count": len(rows),
+            "fixed_stake_pnl_usdt": pnl,
+            "average_net_return_percent_per_trade": float(np.mean(returns) * 100.0) if returns else None,
+            "maximum_drawdown_usdt": drawdown["maximum_drawdown_usdt"],
+            "maximum_drawdown_percent_of_one_stake": drawdown["maximum_drawdown_percent_of_one_stake"],
+            "profitable_trade_count": sum(value > 0 for value in returns),
+            "estimated_costs_included": True,
+        }
+
+    baseline_summary = summarize(baseline)
+    filtered_summary = summarize(filtered)
+    return {
+        "report_type": "experimental-bullish-regime-filter-comparison",
+        "filter_definition": "Keep baseline BUY signals only when current-candle sma_gap_20 > 0 (close above the 20-period moving average proxy).",
+        "baseline_fixed_threshold": baseline_summary,
+        "bullish_regime_filtered": filtered_summary,
+        "pnl_difference_filtered_minus_baseline_usdt": filtered_summary["fixed_stake_pnl_usdt"] - baseline_summary["fixed_stake_pnl_usdt"],
+        "trade_count_reduction": baseline_summary["buy_signal_count"] - filtered_summary["buy_signal_count"],
+        "same_out_of_sample_predictions": True,
+        "selection_used_outer_test_returns": False,
+        "real_money_trading_eligible": False,
+        "interpretation": "Compare after-cost PnL and drawdown as well as trade count. Fewer trades or higher win rate alone is not evidence of a better strategy."
+    }
+
+
 def walk_forward_evaluate(candles):
     _validate_settings()
     frame = build_feature_frame(candles)
@@ -484,6 +524,7 @@ def walk_forward_evaluate(candles):
             "net_return_fraction": _net_one_candle_return(
                 float(current.iloc[0]["close"]), float(usable.iloc[i + 1]["close"])
             ),
+            "sma_gap_20": float(current.iloc[0]["sma_gap_20"]) if np.isfinite(float(current.iloc[0]["sma_gap_20"])) else None,
         })
 
     if len(predictions) < 20:
@@ -504,6 +545,7 @@ def walk_forward_evaluate(candles):
     )
     position_strategy = simulate_position_strategy(usable, predictions)
     holding_period_analysis = analyze_holding_periods(usable, predictions)
+    regime_filter_comparison = compare_bullish_regime_filter(predictions)
     net_total_return = float(np.prod([1.0 + r for r in trade_returns]) - 1.0) if trade_returns else 0.0
     baseline_total_return = float(np.prod([1.0 + r for r in baseline_returns]) - 1.0)
     return {
@@ -571,6 +613,7 @@ def walk_forward_evaluate(candles):
         ],
         "probability_band_after_cost_analysis": summarize_probability_bands(predictions),
         "holding_period_cost_analysis": holding_period_analysis,
+        "bullish_regime_filter_comparison": regime_filter_comparison,
         "sample_predictions": predictions[-10:],
     }
 
