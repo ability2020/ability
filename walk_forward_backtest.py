@@ -669,10 +669,12 @@ def analyze_holding_periods(usable, predictions, holding_periods=(1, 3, 6, 12)):
         if not isinstance(horizon, int) or horizon < 1:
             raise ValueError("Holding periods must be positive integers.")
         trades = []
-        next_available_index = 0
+        # Do not re-enter on the same candle that closed the prior trade.
+        # This keeps holding-period samples strictly non-overlapping at candle boundaries.
+        next_available_index = -1
         for entry_index in buy_indices:
             exit_index = entry_index + horizon
-            if entry_index < next_available_index or exit_index >= len(usable):
+            if entry_index <= next_available_index or exit_index >= len(usable):
                 continue
             entry_price = float(usable.iloc[entry_index]["close"])
             exit_price = float(usable.iloc[exit_index]["close"])
