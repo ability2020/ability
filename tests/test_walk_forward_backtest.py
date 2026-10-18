@@ -227,7 +227,7 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertTrue(report["multi_period_evaluation_available"])
         self.assertEqual(report["period_count_evaluated"], 4)
         self.assertTrue(report["periods_are_chronologically_ordered_and_non_overlapping"])
-        self.assertFalse(report["multi_period_research_gate_passed"] if report["positive_research_gate_period_count"] < 4 else False)
+        self.assertEqual(report["multi_period_research_gate_passed"], report["positive_research_gate_period_count"] == 4)
         self.assertFalse(report["real_money_trading_eligible"])
         periods = report["periods"]
         self.assertEqual(len(periods), 4)
