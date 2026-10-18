@@ -49,6 +49,39 @@ class WalkForwardBacktestTests(unittest.TestCase):
         )
         self.assertIn("no orders are submitted", " ".join(report["caveats"]))
 
+    def test_cost_aware_threshold_rejects_nonpositive_or_baseline_losing_candidates(self):
+        chosen = walk_forward_backtest.choose_cost_aware_threshold(
+            {
+                0.52: [0.004, 0.003, 0.002, 0.001, 0.002],
+                0.58: [0.001, 0.001, 0.001, 0.001, 0.001],
+                0.65: [-0.001, -0.002, 0.001, -0.001, -0.002],
+                0.70: [0.01, 0.01],
+            },
+            baseline_average_return=0.0015,
+            fallback_threshold=0.58,
+            minimum_trades=5,
+        )
+        # 0.52 is profitable and beats the baseline; 0.58 does not beat it,
+        # 0.65 loses after costs, and 0.70 has too few validation trades.
+        self.assertEqual(chosen, 0.52)
+
+    def test_cost_aware_threshold_falls_back_when_no_candidate_beats_baseline(self):
+        chosen = walk_forward_backtest.choose_cost_aware_threshold(
+            {0.52: [0.001] * 5, 0.58: [-0.001] * 8},
+            baseline_average_return=0.001,
+            fallback_threshold=0.58,
+            minimum_trades=5,
+        )
+        self.assertEqual(chosen, 0.58)
+
+    def test_fixed_stake_drawdown_is_peak_to_trough(self):
+        result = walk_forward_backtest.summarize_fixed_stake_drawdown(
+            [0.02, 0.01, -0.03, -0.01, 0.02], stake_usdt=10.0
+        )
+        self.assertAlmostEqual(result["maximum_drawdown_usdt"], 0.4)
+        self.assertAlmostEqual(result["maximum_drawdown_percent_of_one_stake"], 4.0)
+        self.assertIn("peak-to-trough", result["drawdown_method"])
+
     def test_research_gate_requires_positive_after_costs_and_benchmark_outperformance(self):
         passing = walk_forward_backtest.evaluate_research_gate(
             860, 50, 0.002, -0.001, 1.0
