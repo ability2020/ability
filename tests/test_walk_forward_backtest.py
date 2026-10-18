@@ -219,6 +219,22 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertLess(periods[1]["last_candle_timestamp"], periods[2]["first_candle_timestamp"])
         self.assertTrue(all(not period["real_money_trading_eligible"] for period in periods))
 
+
+    def test_four_period_robustness_check_is_disjoint_and_research_only(self):
+        report = walk_forward_backtest.evaluate_multiple_unseen_periods(
+            make_candles(800), period_count=4
+        )
+        self.assertTrue(report["multi_period_evaluation_available"])
+        self.assertEqual(report["period_count_evaluated"], 4)
+        self.assertTrue(report["periods_are_chronologically_ordered_and_non_overlapping"])
+        self.assertEqual(report["multi_period_research_gate_passed"], report["positive_research_gate_period_count"] == 4)
+        self.assertFalse(report["real_money_trading_eligible"])
+        periods = report["periods"]
+        self.assertEqual(len(periods), 4)
+        for left, right in zip(periods, periods[1:]):
+            self.assertLess(left["last_candle_timestamp"], right["first_candle_timestamp"])
+        self.assertTrue(all(period["real_money_trading_eligible"] is False for period in periods))
+
     def test_multiple_period_evaluation_reports_insufficient_data_safely(self):
         report = walk_forward_backtest.evaluate_multiple_unseen_periods(make_candles(220), period_count=3)
         self.assertFalse(report["multi_period_evaluation_available"])

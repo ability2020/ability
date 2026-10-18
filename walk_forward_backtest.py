@@ -532,7 +532,7 @@ def walk_forward_evaluate(candles):
 
 
 
-def evaluate_multiple_unseen_periods(candles, period_count=3):
+def evaluate_multiple_unseen_periods(candles, period_count=4):
     """Evaluate disjoint chronological periods separately; research only, never authorizes orders."""
     if not isinstance(period_count, int) or period_count < 2:
         raise ValueError("period_count must be an integer of at least 2.")
@@ -728,7 +728,7 @@ def analyze_holding_periods(usable, predictions, holding_periods=(1, 3, 6, 12)):
 def main():
     candles = fetch_candles()
     result = walk_forward_evaluate(candles)
-    multi_period_result = evaluate_multiple_unseen_periods(candles, period_count=3)
+    multi_period_result = evaluate_multiple_unseen_periods(candles, period_count=4)
     created_at = datetime.now(timezone.utc).isoformat()
     result["multi_period_evaluation"] = multi_period_result
     result["created_at_utc"] = created_at
