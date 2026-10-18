@@ -53,6 +53,40 @@ def _net_one_candle_return(entry_close, next_close):
     return (exit_proceeds_after_fee - STAKE_USDT - entry_fee) / STAKE_USDT
 
 
+def choose_cost_aware_threshold(candidate_returns, baseline_average_return, fallback_threshold, minimum_trades=5):
+    """Choose only a validation threshold with positive net returns that beat the same-window baseline."""
+    best_threshold = float(fallback_threshold)
+    best_average_return = None
+    for threshold, returns in candidate_returns.items():
+        if len(returns) < minimum_trades:
+            continue
+        average_return = float(np.mean(returns))
+        if average_return <= 0.0 or average_return <= float(baseline_average_return):
+            continue
+        if best_average_return is None or average_return > best_average_return:
+            best_average_return = average_return
+            best_threshold = float(threshold)
+    return best_threshold
+
+
+def summarize_fixed_stake_drawdown(net_returns, stake_usdt=STAKE_USDT):
+    """Summarize peak-to-trough drawdown of sequential fixed-stake trade PnL."""
+    cumulative_pnl = 0.0
+    peak_pnl = 0.0
+    maximum_drawdown = 0.0
+    for net_return in net_returns:
+        cumulative_pnl += float(net_return) * float(stake_usdt)
+        peak_pnl = max(peak_pnl, cumulative_pnl)
+        maximum_drawdown = max(maximum_drawdown, peak_pnl - cumulative_pnl)
+    return {
+        "maximum_drawdown_usdt": float(maximum_drawdown),
+        "maximum_drawdown_percent_of_one_stake": (
+            float(maximum_drawdown / float(stake_usdt) * 100.0) if float(stake_usdt) > 0 else None
+        ),
+        "drawdown_method": "Sequential fixed-stake trade PnL peak-to-trough; excludes idle cash, overlapping positions, and portfolio sizing.",
+    }
+
+
 def _select_buy_threshold(train, usable):
     """Select a threshold using only an inner chronological validation slice of training data."""
     candidates = (0.52, 0.55, 0.58, 0.62, 0.65, 0.70)
@@ -60,7 +94,7 @@ def _select_buy_threshold(train, usable):
     fit = train.iloc[:split]
     validation = train.iloc[split:]
     # Too little validation data to compare thresholds meaningfully: keep the
-    # conservative configured threshold rather than tuning on a tiny sample.
+    # configured threshold rather than tuning on a tiny sample.
     if len(fit) < MIN_SAMPLES or len(validation) < 20 or fit["target"].nunique() < 2:
         return BUY_THRESHOLD
 
@@ -70,14 +104,23 @@ def _select_buy_threshold(train, usable):
     )
     validation_model.fit(fit[FEATURE_COLUMNS], fit["target"].astype(int))
     probabilities = validation_model.predict_proba(validation[FEATURE_COLUMNS])[:, 1]
-    best_threshold = BUY_THRESHOLD
-    best_average_return = None
-    minimum_trades = 5
+    validation_returns = []
+    for position in range(len(validation)):
+        row_index = int(validation.index[position])
+        if row_index + 1 >= len(usable):
+            continue
+        validation_returns.append(_net_one_candle_return(
+            float(usable.iloc[row_index]["close"]),
+            float(usable.iloc[row_index + 1]["close"]),
+        ))
+    if not validation_returns:
+        return BUY_THRESHOLD
+    baseline_average_return = float(np.mean(validation_returns))
 
+    candidate_returns = {}
+    minimum_trades = 5
     for threshold in candidates:
         selected_positions = np.flatnonzero(probabilities >= threshold)
-        if len(selected_positions) < minimum_trades:
-            continue
         returns = []
         for position in selected_positions:
             row_index = int(validation.index[position])
@@ -87,17 +130,11 @@ def _select_buy_threshold(train, usable):
                 float(usable.iloc[row_index]["close"]),
                 float(usable.iloc[row_index + 1]["close"]),
             ))
-        if len(returns) < minimum_trades:
-            continue
-        average_return = float(np.mean(returns))
-        if best_average_return is None or average_return > best_average_return:
-            best_average_return = average_return
-            best_threshold = threshold
-    # Do not adopt a threshold whose inner validation trades are not profitable
-    # after estimated fees and slippage. Fall back to the configured threshold.
-    if best_average_return is None or best_average_return <= 0.0:
-        return BUY_THRESHOLD
-    return float(best_threshold)
+        candidate_returns[threshold] = returns
+
+    return choose_cost_aware_threshold(
+        candidate_returns, baseline_average_return, BUY_THRESHOLD, minimum_trades
+    )
 
 
 def evaluate_research_gate(prediction_count, buy_count, average_buy_return, average_market_return, fixed_stake_pnl):
@@ -456,6 +493,8 @@ def walk_forward_evaluate(candles):
     # below are illustrative and are not a portfolio-level simulation.
     fixed_stake_pnl_usdt = float(sum(trade_returns) * STAKE_USDT)
     tuned_fixed_stake_pnl_usdt = float(sum(tuned_trade_returns) * STAKE_USDT)
+    drawdown_summary = summarize_fixed_stake_drawdown(trade_returns)
+    tuned_drawdown_summary = summarize_fixed_stake_drawdown(tuned_trade_returns)
     tuned_average_buy_return = float(np.mean(tuned_trade_returns)) if tuned_trade_returns else None
     average_buy_return = float(np.mean(trade_returns)) if trade_returns else None
     average_market_return = float(np.mean(baseline_returns))
@@ -483,7 +522,7 @@ def walk_forward_evaluate(candles):
         "buy_signal_count": buy_count,
         **research_gate,
         **position_strategy,
-        "threshold_tuning_method": "At each walk-forward step, compare fixed candidate BUY thresholds on an inner chronological validation slice from that step's training data only; use the selected threshold only for that step only if its average estimated net return is positive. If validation is too small, has fewer than five candidate trades, or no candidate has positive average net return after estimated costs, fall back to ML_BUY_THRESHOLD. This is exploratory and can overfit the inner validation slice.",
+        "threshold_tuning_method": "At each walk-forward step, compare fixed BUY thresholds on an inner chronological validation slice from that step's training data only. A candidate must have at least five trades, positive average net return after estimated costs, and beat the same-window all-candle baseline after costs; otherwise fall back to ML_BUY_THRESHOLD. The later walk-forward prediction is not used to select its threshold. This remains exploratory and may overfit validation.",
         "configured_buy_threshold": BUY_THRESHOLD,
         "selected_buy_threshold_min": float(min(selected_thresholds)),
         "selected_buy_threshold_max": float(max(selected_thresholds)),
@@ -502,6 +541,11 @@ def walk_forward_evaluate(candles):
         "estimated_round_trip_cost_percent_approx": float((2 * FEE_RATE + 2 * SLIPPAGE_RATE) * 100),
         "buy_only_trade_count": int(len(trade_returns)),
         "buy_only_fixed_stake_total_pnl_usdt": fixed_stake_pnl_usdt,
+        "buy_only_max_drawdown_usdt": drawdown_summary["maximum_drawdown_usdt"],
+        "buy_only_max_drawdown_percent_of_one_stake": drawdown_summary["maximum_drawdown_percent_of_one_stake"],
+        "buy_only_drawdown_method": drawdown_summary["drawdown_method"],
+        "tuned_buy_only_max_drawdown_usdt": tuned_drawdown_summary["maximum_drawdown_usdt"],
+        "tuned_buy_only_max_drawdown_percent_of_one_stake": tuned_drawdown_summary["maximum_drawdown_percent_of_one_stake"],
         "buy_only_return_on_total_deployed_stake_percent": average_buy_return * 100 if average_buy_return is not None else None,
         "buy_only_average_net_return_percent_per_trade": average_buy_return * 100 if average_buy_return is not None else None,
         "all_test_candles_average_net_return_percent": average_market_return * 100,
@@ -592,6 +636,8 @@ def evaluate_multiple_unseen_periods(candles, period_count=4):
             ) * 100.0,
             "buy_signal_count": report["buy_signal_count"],
             "buy_only_fixed_stake_total_pnl_usdt": report["buy_only_fixed_stake_total_pnl_usdt"],
+            "buy_only_max_drawdown_usdt": report["buy_only_max_drawdown_usdt"],
+            "buy_only_max_drawdown_percent_of_one_stake": report["buy_only_max_drawdown_percent_of_one_stake"],
             "buy_only_average_net_return_percent_per_trade": average_buy,
             "all_test_candles_average_net_return_percent": average_market,
             "buy_return_edge_over_all_candles_percentage_points": (
