@@ -49,12 +49,10 @@ def _fit_model(train, features):
 def _returns_for_rows(usable, rows):
     values = []
     for index in rows.index:
-        index = int(index)
-        if index + 1 < len(usable):
-            values.append(net_one_candle_return(
-                float(usable.iloc[index]["close"]),
-                float(usable.iloc[index + 1]["close"]),
-            ))
+        row = usable.iloc[int(index)]
+        next_close = row.get("next_close")
+        if next_close is not None and np.isfinite(float(next_close)):
+            values.append(net_one_candle_return(float(row["close"]), float(next_close)))
         else:
             values.append(None)
     return values
@@ -78,7 +76,9 @@ def _candidate_summary(probabilities, returns):
 
 def evaluate_model_selection(candles):
     frame = build_feature_frame(candles)
-    usable = frame.dropna(subset=FEATURE_COLUMNS + ["target"]).reset_index(drop=True)
+    usable = frame.assign(next_close=frame["close"].shift(-1)).dropna(
+        subset=FEATURE_COLUMNS + ["target", "next_close"]
+    ).reset_index(drop=True)
     n = len(usable)
     if n < 240:
         return {
