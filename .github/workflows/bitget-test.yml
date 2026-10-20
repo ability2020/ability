@@ -46,6 +46,9 @@ jobs:
       - name: Compare baseline and expanded features chronologically (no orders)
         run: python feature_ablation.py
 
+      - name: Select model and threshold on validation data; test on untouched holdout (no orders)
+        run: python model_selection.py
+
       - name: Walk-forward backtest with estimated fees and slippage (no orders)
         run: python walk_forward_backtest.py
 
@@ -288,6 +291,62 @@ jobs:
           except (OSError, json.JSONDecodeError):
               walk_forward_report = None
 
+          fee_rate = 0.001
+          slippage_rate = 0.0005
+          recorded_closed_gross = 0.0
+          recorded_closed_costs = 0.0
+          recorded_closed_trades = []
+          for trade in state["closed_trades"]:
+              entry = float(trade["entry_price"])
+              exit_price = float(trade["exit_price"])
+              quantity = float(trade["quantity"])
+              gross = float(trade["pnl_usdt"])
+              entry_fee = entry * quantity * fee_rate
+              exit_fee = exit_price * quantity * fee_rate
+              entry_slippage = entry * quantity * slippage_rate
+              exit_slippage = exit_price * quantity * slippage_rate
+              costs = entry_fee + exit_fee + entry_slippage + exit_slippage
+              recorded_closed_gross += gross
+              recorded_closed_costs += costs
+              recorded_closed_trades.append({
+                  **trade,
+                  "estimated_entry_fee_usdt": entry_fee,
+                  "estimated_exit_fee_usdt": exit_fee,
+                  "estimated_entry_slippage_usdt": entry_slippage,
+                  "estimated_exit_slippage_usdt": exit_slippage,
+                  "estimated_total_costs_usdt": costs,
+                  "estimated_net_pnl_usdt": gross - costs,
+              })
+
+          open_position = state["position"]
+          current_price = None
+          if isinstance(latest_signal, dict):
+              try:
+                  current_price = float(latest_signal.get("ticker_price"))
+              except (TypeError, ValueError):
+                  current_price = None
+          unrealized = None
+          if isinstance(open_position, dict) and current_price is not None and current_price > 0:
+              entry = float(open_position["entry_price"])
+              quantity = float(open_position["quantity"])
+              gross = (current_price - entry) * quantity
+              entry_fee = entry * quantity * fee_rate
+              exit_fee = current_price * quantity * fee_rate
+              entry_slippage = entry * quantity * slippage_rate
+              exit_slippage = current_price * quantity * slippage_rate
+              costs = entry_fee + exit_fee + entry_slippage + exit_slippage
+              unrealized = {
+                  "mark_price": current_price,
+                  "gross_pnl_usdt": gross,
+                  "estimated_entry_fee_usdt": entry_fee,
+                  "estimated_exit_fee_usdt": exit_fee,
+                  "estimated_entry_slippage_usdt": entry_slippage,
+                  "estimated_exit_slippage_usdt": exit_slippage,
+                  "estimated_total_costs_usdt": costs,
+                  "estimated_net_pnl_usdt": gross - costs,
+                  "cost_assumptions": "0.10% fee and 0.05% slippage per side; estimates only",
+              }
+
           report = {
               "report_type": "paper-trading-only-with-market-signal",
               "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -299,10 +358,19 @@ jobs:
               "experimental_learning_model": learning_report,
               "walk_forward_evaluation": walk_forward_report,
               "realized_pnl_usdt_gross": state["realized_pnl_usdt"],
+              "recorded_closed_trades_gross_pnl_usdt": recorded_closed_gross,
+              "recorded_closed_trades_estimated_costs_usdt": recorded_closed_costs,
+              "recorded_closed_trades_estimated_net_pnl_usdt": recorded_closed_gross - recorded_closed_costs,
               "closed_trade_count": len(state["closed_trades"]),
-              "open_position": state["position"],
-              "closed_trades": state["closed_trades"],
-              "note": "Simulated results only. Paper positions are hypothetical and independent of real exchange balances. The account risk decision is informational and does not control the offline paper simulator. No exchange order is sent. PnL is gross and may exclude fees/slippage.",
+              "open_position": open_position,
+              "open_position_unrealized_pnl": unrealized,
+              "closed_trades": recorded_closed_trades,
+              "cost_assumptions": {
+                  "fee_rate_each_side": fee_rate,
+                  "slippage_rate_each_side": slippage_rate,
+                  "note": "Estimated costs are not actual Bitget fills. Closed-trade estimates cover the trades retained in paper state; cumulative gross realized PnL may include older trades no longer retained.",
+              },
+              "note": "Simulated results only. Paper positions are hypothetical and independent of real exchange balances. No exchange order is sent. Gross and estimated net PnL are reported separately.",
           }
           with open("paper_report.json", "w", encoding="utf-8") as file:
               json.dump(report, file, indent=2, allow_nan=False)
@@ -362,5 +430,6 @@ jobs:
             walk_forward_report.json
             multi_period_report.json
             feature_ablation_report.json
+            model_selection_report.json
           if-no-files-found: warn
           retention-days: 30
