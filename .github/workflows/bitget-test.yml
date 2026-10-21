@@ -433,3 +433,40 @@ jobs:
             model_selection_report.json
           if-no-files-found: warn
           retention-days: 30
+
+
+  publish-reports:
+    needs: test
+    if: ${{ always() && github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    concurrency:
+      group: publish-reports
+      cancel-in-progress: false
+    steps:
+      - name: Check out reports branch
+        uses: actions/checkout@v6
+        with:
+          ref: reports
+
+      - name: Download this run's report files
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: paper-trading-report-run-${{ github.run_number }}
+          path: latest
+
+      - name: Commit and push reports
+        run: |
+          mkdir -p latest
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A latest
+          if git diff --cached --quiet; then
+            echo "No report changes to publish."
+          else
+            git commit -m "Reports from run ${{ github.run_number }}"
+            git push origin reports
+          fi
