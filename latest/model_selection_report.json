@@ -1,0 +1,224 @@
+{
+  "report_type": "validation-selected-model-cost-aware-holdout",
+  "available": true,
+  "created_at_utc": "2026-10-21T08:05:31.612065+00:00",
+  "symbol": "BTCUSDT",
+  "interval": "5m",
+  "usable_labelled_candle_count": 966,
+  "split": {
+    "training_count": 579,
+    "validation_count": 193,
+    "untouched_test_count": 194,
+    "chronological_order": "train -> validation -> untouched test",
+    "test_used_for_selection": false
+  },
+  "cost_assumptions": {
+    "stake_usdt": 10.0,
+    "fee_rate_each_side": 0.001,
+    "slippage_rate_each_side": 0.0005,
+    "method": "Each hypothetical BUY is closed one candle later; costs are estimated on entry and exit."
+  },
+  "validation_market_average_net_return_percent": -0.29572766283641044,
+  "validation_model_diagnostics": {
+    "baseline_features": {
+      "thresholds": [
+        {
+          "threshold": 0.52,
+          "trade_count": 86,
+          "average_net_return_percent": -0.2944381555972386,
+          "fixed_stake_net_pnl_usdt": -2.532168138136252
+        },
+        {
+          "threshold": 0.55,
+          "trade_count": 64,
+          "average_net_return_percent": -0.2902935325408595,
+          "fixed_stake_net_pnl_usdt": -1.8578786082615006
+        },
+        {
+          "threshold": 0.58,
+          "trade_count": 43,
+          "average_net_return_percent": -0.2988026875177043,
+          "fixed_stake_net_pnl_usdt": -1.2848515563261285
+        },
+        {
+          "threshold": 0.62,
+          "trade_count": 17,
+          "average_net_return_percent": -0.2903159614091339,
+          "fixed_stake_net_pnl_usdt": -0.4935371343955276
+        },
+        {
+          "threshold": 0.65,
+          "trade_count": 10,
+          "average_net_return_percent": -0.2954868958984033,
+          "fixed_stake_net_pnl_usdt": -0.29548689589840327
+        }
+      ],
+      "validation_accuracy_at_0_5": 0.49740932642487046
+    },
+    "expanded_features": {
+      "thresholds": [
+        {
+          "threshold": 0.52,
+          "trade_count": 74,
+          "average_net_return_percent": -0.30518156745799296,
+          "fixed_stake_net_pnl_usdt": -2.258343599189148
+        },
+        {
+          "threshold": 0.55,
+          "trade_count": 57,
+          "average_net_return_percent": -0.29124018469853924,
+          "fixed_stake_net_pnl_usdt": -1.660069052781674
+        },
+        {
+          "threshold": 0.58,
+          "trade_count": 44,
+          "average_net_return_percent": -0.2907536544744653,
+          "fixed_stake_net_pnl_usdt": -1.279316079687647
+        },
+        {
+          "threshold": 0.62,
+          "trade_count": 28,
+          "average_net_return_percent": -0.29213409015342634,
+          "fixed_stake_net_pnl_usdt": -0.8179754524295937
+        },
+        {
+          "threshold": 0.65,
+          "trade_count": 18,
+          "average_net_return_percent": -0.2900063313717274,
+          "fixed_stake_net_pnl_usdt": -0.5220113964691093
+        }
+      ],
+      "validation_accuracy_at_0_5": 0.5129533678756477
+    }
+  },
+  "selection_candidates": [
+    {
+      "model": "baseline_features",
+      "threshold": 0.52,
+      "validation_trade_count": 86,
+      "validation_average_net_return_percent": -0.2944381555972386,
+      "validation_net_pnl_usdt": -2.532168138136252,
+      "beats_validation_market_after_costs": true,
+      "eligible_for_selection": false
+    },
+    {
+      "model": "baseline_features",
+      "threshold": 0.55,
+      "validation_trade_count": 64,
+      "validation_average_net_return_percent": -0.2902935325408595,
+      "validation_net_pnl_usdt": -1.8578786082615006,
+      "beats_validation_market_after_costs": true,
+      "eligible_for_selection": false
+    },
+    {
+      "model": "baseline_features",
+      "threshold": 0.58,
+      "validation_trade_count": 43,
+      "validation_average_net_return_percent": -0.2988026875177043,
+      "validation_net_pnl_usdt": -1.2848515563261285,
+      "beats_validation_market_after_costs": false,
+      "eligible_for_selection": false
+    },
+    {
+      "model": "baseline_features",
+      "threshold": 0.62,
+      "validation_trade_count": 17,
+      "validation_average_net_return_percent": -0.2903159614091339,
+      "validation_net_pnl_usdt": -0.4935371343955276,
+      "beats_validation_market_after_costs": true,
+      "eligible_for_selection": false
+    },
+    {
+      "model": "baseline_features",
+      "threshold": 0.65,
+      "validation_trade_count": 10,
+      "validation_average_net_return_percent": -0.2954868958984033,
+      "validation_net_pnl_usdt": -0.29548689589840327,
+      "beats_validation_market_after_costs": true,
+      "eligible_for_selection": false
+    },
+    {
+      "model": "expanded_features",
+      "threshold": 0.52,
+      "validation_trade_count": 74,
+      "validation_average_net_return_percent": -0.30518156745799296,
+      "validation_net_pnl_usdt": -2.258343599189148,
+      "beats_validation_market_after_costs": false,
+      "eligible_for_selection": false
+    },
+    {
+      "model": "expanded_features",
+      "threshold": 0.55,
+      "validation_trade_count": 57,
+      "validation_average_net_return_percent": -0.29124018469853924,
+      "validation_net_pnl_usdt": -1.660069052781674,
+      "beats_validation_market_after_costs": true,
+      "eligible_for_selection": false
+    },
+    {
+      "model": "expanded_features",
+      "threshold": 0.58,
+      "validation_trade_count": 44,
+      "validation_average_net_return_percent": -0.2907536544744653,
+      "validation_net_pnl_usdt": -1.279316079687647,
+      "beats_validation_market_after_costs": true,
+      "eligible_for_selection": false
+    },
+    {
+      "model": "expanded_features",
+      "threshold": 0.62,
+      "validation_trade_count": 28,
+      "validation_average_net_return_percent": -0.29213409015342634,
+      "validation_net_pnl_usdt": -0.8179754524295937,
+      "beats_validation_market_after_costs": true,
+      "eligible_for_selection": false
+    },
+    {
+      "model": "expanded_features",
+      "threshold": 0.65,
+      "validation_trade_count": 18,
+      "validation_average_net_return_percent": -0.2900063313717274,
+      "validation_net_pnl_usdt": -0.5220113964691093,
+      "beats_validation_market_after_costs": true,
+      "eligible_for_selection": false
+    }
+  ],
+  "selected_model": "baseline_features",
+  "selected_buy_threshold": 0.58,
+  "selection_reason": "No model/threshold met validation profitability, benchmark, and sample-size rules; conservative baseline/default threshold retained for holdout diagnosis only.",
+  "holdout": {
+    "prediction_count": 194,
+    "directional_accuracy": 0.5360824742268041,
+    "balanced_accuracy": 0.5355809239304385,
+    "buy_count": 15,
+    "average_net_buy_return_percent": -0.31649962593834596,
+    "fixed_stake_net_pnl_usdt": -0.474749438907519,
+    "market_average_net_return_percent": -0.2964177339727385,
+    "beats_market_after_costs": false,
+    "positive_net_pnl": false,
+    "model_diagnostics_at_fixed_threshold": {
+      "baseline_features": {
+        "accuracy": 0.5360824742268041,
+        "balanced_accuracy": 0.5355809239304385,
+        "fixed_threshold": 0.58,
+        "buy_count": 15,
+        "average_net_buy_return_percent": -0.31649962593834596,
+        "fixed_stake_net_pnl_usdt": -0.474749438907519,
+        "selection_use": "diagnostic only; not used to change selected model or threshold"
+      },
+      "expanded_features": {
+        "accuracy": 0.5567010309278351,
+        "balanced_accuracy": 0.5543582630961272,
+        "fixed_threshold": 0.58,
+        "buy_count": 21,
+        "average_net_buy_return_percent": -0.30830039650714336,
+        "fixed_stake_net_pnl_usdt": -0.6474308326650011,
+        "selection_use": "diagnostic only; not used to change selected model or threshold"
+      }
+    },
+    "note": "This final test period is reported after selection and must not be used to retune this same report."
+  },
+  "multi_period_gate_remains_authoritative": true,
+  "real_money_trading_eligible": false,
+  "orders_sent": false
+}

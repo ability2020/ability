@@ -1,0 +1,303 @@
+{
+  "report_type": "chronological-feature-ablation",
+  "available": true,
+  "created_at_utc": "2026-10-21T08:05:29.698954+00:00",
+  "symbol": "BTCUSDT",
+  "interval": "5m",
+  "usable_candle_count": 966,
+  "method": "Expanding chronological training windows; test windows occur strictly after training. Reports BUY thresholds 0.55, 0.58, and 0.62 as diagnostics only; estimated 0.10% fee and 0.05% slippage per side; fixed 10 USDT stake.",
+  "baseline_features": {
+    "available": true,
+    "features": [
+      "return_1",
+      "return_3",
+      "return_6",
+      "sma_gap_5",
+      "sma_gap_10",
+      "sma_gap_20",
+      "volatility_10",
+      "range_pct",
+      "body_pct",
+      "volume_change"
+    ],
+    "fold_count": 3,
+    "folds": [
+      {
+        "fold": 1,
+        "train_count": 483,
+        "test_count": 161,
+        "test_accuracy": 0.5403726708074534,
+        "test_balanced_accuracy": 0.5396284829721363,
+        "brier_score": 0.25445863224983045,
+        "buy_signal_count": 30,
+        "average_net_buy_return_percent": -0.28414827567377926,
+        "fixed_stake_net_pnl_usdt": -0.852444827021338,
+        "max_drawdown_usdt": 0.8524448270213382,
+        "threshold_diagnostics": {
+          "0.55": {
+            "buy_signal_count": 52,
+            "net_pnl_usdt": -1.483195522219193,
+            "average_net_return_percent": -0.28522990811907556,
+            "max_drawdown_usdt": 1.4831955222191933
+          },
+          "0.58": {
+            "buy_signal_count": 30,
+            "net_pnl_usdt": -0.8524448270213381,
+            "average_net_return_percent": -0.28414827567377926,
+            "max_drawdown_usdt": 0.8524448270213382
+          },
+          "0.62": {
+            "buy_signal_count": 10,
+            "net_pnl_usdt": -0.2645515830528499,
+            "average_net_return_percent": -0.2645515830528499,
+            "max_drawdown_usdt": 0.2645515830528499
+          }
+        }
+      },
+      {
+        "fold": 2,
+        "train_count": 644,
+        "test_count": 161,
+        "test_accuracy": 0.5279503105590062,
+        "test_balanced_accuracy": 0.5278807537843683,
+        "brier_score": 0.24886525524483655,
+        "buy_signal_count": 29,
+        "average_net_buy_return_percent": -0.3044188088294379,
+        "fixed_stake_net_pnl_usdt": -0.8828145456053699,
+        "max_drawdown_usdt": 0.8828145456053696,
+        "threshold_diagnostics": {
+          "0.55": {
+            "buy_signal_count": 51,
+            "net_pnl_usdt": -1.5245990507327074,
+            "average_net_return_percent": -0.2989409903397466,
+            "max_drawdown_usdt": 1.5245990507327076
+          },
+          "0.58": {
+            "buy_signal_count": 29,
+            "net_pnl_usdt": -0.8828145456053695,
+            "average_net_return_percent": -0.3044188088294379,
+            "max_drawdown_usdt": 0.8828145456053696
+          },
+          "0.62": {
+            "buy_signal_count": 15,
+            "net_pnl_usdt": -0.46510374310343006,
+            "average_net_return_percent": -0.3100691620689533,
+            "max_drawdown_usdt": 0.4651037431034301
+          }
+        }
+      },
+      {
+        "fold": 3,
+        "train_count": 805,
+        "test_count": 161,
+        "test_accuracy": 0.5217391304347826,
+        "test_balanced_accuracy": 0.5208791208791208,
+        "brier_score": 0.24935289440802294,
+        "buy_signal_count": 12,
+        "average_net_buy_return_percent": -0.30550556718160365,
+        "fixed_stake_net_pnl_usdt": -0.3666066806179244,
+        "max_drawdown_usdt": 0.36660668061792445,
+        "threshold_diagnostics": {
+          "0.55": {
+            "buy_signal_count": 28,
+            "net_pnl_usdt": -0.8363317424374874,
+            "average_net_return_percent": -0.2986899080133884,
+            "max_drawdown_usdt": 0.8363317424374876
+          },
+          "0.58": {
+            "buy_signal_count": 12,
+            "net_pnl_usdt": -0.3666066806179244,
+            "average_net_return_percent": -0.30550556718160365,
+            "max_drawdown_usdt": 0.36660668061792445
+          },
+          "0.62": {
+            "buy_signal_count": 3,
+            "net_pnl_usdt": -0.09278883129709278,
+            "average_net_return_percent": -0.30929610432364263,
+            "max_drawdown_usdt": 0.09278883129709278
+          }
+        }
+      }
+    ],
+    "test_sample_count": 483,
+    "test_accuracy": 0.5300207039337475,
+    "test_balanced_accuracy": 0.5294627858785418,
+    "brier_score": 0.25089226063423,
+    "buy_signal_count": 71,
+    "average_net_buy_return_percent": -0.29603747228797633,
+    "fixed_stake_net_pnl_usdt": -2.101866053244632,
+    "max_fold_drawdown_usdt": 0.8828145456053696,
+    "threshold_diagnostics": {
+      "0.55": {
+        "buy_signal_count": 131,
+        "net_pnl_usdt": -3.8441263153893876,
+        "max_fold_drawdown_usdt": 1.5245990507327076
+      },
+      "0.58": {
+        "buy_signal_count": 71,
+        "net_pnl_usdt": -2.101866053244632,
+        "max_fold_drawdown_usdt": 0.8828145456053696
+      },
+      "0.62": {
+        "buy_signal_count": 28,
+        "net_pnl_usdt": -0.8224441574533727,
+        "max_fold_drawdown_usdt": 0.4651037431034301
+      }
+    }
+  },
+  "expanded_features": {
+    "available": true,
+    "features": [
+      "return_1",
+      "return_3",
+      "return_6",
+      "sma_gap_5",
+      "sma_gap_10",
+      "sma_gap_20",
+      "volatility_10",
+      "range_pct",
+      "body_pct",
+      "volume_change",
+      "rsi_14",
+      "macd_hist_pct",
+      "atr_pct",
+      "volume_zscore_20"
+    ],
+    "fold_count": 3,
+    "folds": [
+      {
+        "fold": 1,
+        "train_count": 483,
+        "test_count": 161,
+        "test_accuracy": 0.4968944099378882,
+        "test_balanced_accuracy": 0.4963622291021672,
+        "brier_score": 0.25460910495430855,
+        "buy_signal_count": 38,
+        "average_net_buy_return_percent": -0.27876165495924926,
+        "fixed_stake_net_pnl_usdt": -1.0592942888451473,
+        "max_drawdown_usdt": 1.0592942888451475,
+        "threshold_diagnostics": {
+          "0.55": {
+            "buy_signal_count": 60,
+            "net_pnl_usdt": -1.7298034927360768,
+            "average_net_return_percent": -0.2883005821226794,
+            "max_drawdown_usdt": 1.729803492736077
+          },
+          "0.58": {
+            "buy_signal_count": 38,
+            "net_pnl_usdt": -1.0592942888451475,
+            "average_net_return_percent": -0.27876165495924926,
+            "max_drawdown_usdt": 1.0592942888451475
+          },
+          "0.62": {
+            "buy_signal_count": 19,
+            "net_pnl_usdt": -0.5216705877836306,
+            "average_net_return_percent": -0.27456346725454245,
+            "max_drawdown_usdt": 0.5216705877836306
+          }
+        }
+      },
+      {
+        "fold": 2,
+        "train_count": 644,
+        "test_count": 161,
+        "test_accuracy": 0.5341614906832298,
+        "test_balanced_accuracy": 0.5346771702193389,
+        "brier_score": 0.2526372946211633,
+        "buy_signal_count": 45,
+        "average_net_buy_return_percent": -0.30451604448550545,
+        "fixed_stake_net_pnl_usdt": -1.3703222001847746,
+        "max_drawdown_usdt": 1.3703222001847746,
+        "threshold_diagnostics": {
+          "0.55": {
+            "buy_signal_count": 57,
+            "net_pnl_usdt": -1.7030508261130082,
+            "average_net_return_percent": -0.2987808466864927,
+            "max_drawdown_usdt": 1.7030508261130084
+          },
+          "0.58": {
+            "buy_signal_count": 45,
+            "net_pnl_usdt": -1.3703222001847744,
+            "average_net_return_percent": -0.30451604448550545,
+            "max_drawdown_usdt": 1.3703222001847746
+          },
+          "0.62": {
+            "buy_signal_count": 27,
+            "net_pnl_usdt": -0.8183805985628898,
+            "average_net_return_percent": -0.30310392539366293,
+            "max_drawdown_usdt": 0.8183805985628899
+          }
+        }
+      },
+      {
+        "fold": 3,
+        "train_count": 805,
+        "test_count": 161,
+        "test_accuracy": 0.5279503105590062,
+        "test_balanced_accuracy": 0.5247252747252747,
+        "brier_score": 0.25472988700464533,
+        "buy_signal_count": 22,
+        "average_net_buy_return_percent": -0.28975139259042215,
+        "fixed_stake_net_pnl_usdt": -0.6374530636989286,
+        "max_drawdown_usdt": 0.6374530636989288,
+        "threshold_diagnostics": {
+          "0.55": {
+            "buy_signal_count": 38,
+            "net_pnl_usdt": -1.1054494053511368,
+            "average_net_return_percent": -0.2909077382502992,
+            "max_drawdown_usdt": 1.105449405351137
+          },
+          "0.58": {
+            "buy_signal_count": 22,
+            "net_pnl_usdt": -0.6374530636989287,
+            "average_net_return_percent": -0.28975139259042215,
+            "max_drawdown_usdt": 0.6374530636989288
+          },
+          "0.62": {
+            "buy_signal_count": 7,
+            "net_pnl_usdt": -0.21388032691969955,
+            "average_net_return_percent": -0.30554332417099944,
+            "max_drawdown_usdt": 0.21388032691969958
+          }
+        }
+      }
+    ],
+    "test_sample_count": 483,
+    "test_accuracy": 0.5196687370600414,
+    "test_balanced_accuracy": 0.5185882246822603,
+    "brier_score": 0.25399209552670576,
+    "buy_signal_count": 105,
+    "average_net_buy_return_percent": -0.29210186216465245,
+    "fixed_stake_net_pnl_usdt": -3.0670695527288503,
+    "max_fold_drawdown_usdt": 1.3703222001847746,
+    "threshold_diagnostics": {
+      "0.55": {
+        "buy_signal_count": 155,
+        "net_pnl_usdt": -4.5383037242002215,
+        "max_fold_drawdown_usdt": 1.729803492736077
+      },
+      "0.58": {
+        "buy_signal_count": 105,
+        "net_pnl_usdt": -3.0670695527288507,
+        "max_fold_drawdown_usdt": 1.3703222001847746
+      },
+      "0.62": {
+        "buy_signal_count": 53,
+        "net_pnl_usdt": -1.55393151326622,
+        "max_fold_drawdown_usdt": 0.8183805985628899
+      }
+    }
+  },
+  "comparison": {
+    "expanded_accuracy_improvement": -0.010351966873706098,
+    "expanded_balanced_accuracy_improvement": -0.010874561196281496,
+    "expanded_brier_score_change_lower_is_better": 0.0030998348924757835,
+    "expanded_after_costs_pnl_improvement_usdt": -0.9652034994842182,
+    "expanded_average_net_buy_return_improvement_percentage_points": 0.003935610123323885,
+    "expanded_model_wins_on_accuracy": false,
+    "expanded_model_wins_on_after_costs_pnl": false
+  },
+  "interpretation": "Research comparison only. Results are noisy, threshold diagnostics are not used to select a threshold, and positive results are not proof of future profitability.",
+  "real_money_trading_eligible": false,
+  "orders_sent": false
+}
