@@ -85,7 +85,7 @@ class LearningModelTests(unittest.TestCase):
 
         timestamps = [int(candle[0]) for candle in candles]
         self.assertEqual(timestamps, sorted(set(timestamps)))
-        self.assertEqual(len(candles), 3)
+        self.assertEqual(len(candles), 4)
         self.assertGreaterEqual(len(calls), 2)
         self.assertEqual(calls[0]["params"]["limit"], "1000")
         self.assertIn("startTime", calls[0]["params"])
