@@ -817,6 +817,29 @@ def analyze_holding_periods(usable, predictions, holding_periods=(1, 3, 6, 12)):
 def main():
     candles = fetch_candles()
     result = walk_forward_evaluate(candles)
+    requested_lookback_days = int(os.getenv("CANDLE_LOOKBACK_DAYS", "60"))
+    interval_ms_by_name = {
+        "1m": 60_000, "3m": 180_000, "5m": 300_000,
+        "15m": 900_000, "30m": 1_800_000,
+        "1H": 3_600_000, "4H": 14_400_000,
+        "6H": 21_600_000, "12H": 43_200_000, "1D": 86_400_000,
+    }
+    first_timestamp = int(candles[0][0])
+    last_timestamp = int(candles[-1][0])
+    interval_ms = interval_ms_by_name.get(INTERVAL)
+    expected_candles = (
+        int(requested_lookback_days * 24 * 60 * 60 * 1000 / interval_ms)
+        if interval_ms else None
+    )
+    result["candle_history_coverage"] = {
+        "requested_lookback_days": requested_lookback_days,
+        "actual_coverage_days": round((last_timestamp - first_timestamp) / 86_400_000, 3),
+        "candle_count": len(candles),
+        "expected_candle_count_approx": expected_candles,
+        "first_candle_utc": datetime.fromtimestamp(first_timestamp / 1000, timezone.utc).isoformat(),
+        "last_candle_utc": datetime.fromtimestamp(last_timestamp / 1000, timezone.utc).isoformat(),
+        "coverage_validation": "fetch_candles validates each 30-day window and requires at least 95% of expected candle count.",
+    }
     multi_period_result = evaluate_multiple_unseen_periods(candles, period_count=4)
     created_at = datetime.now(timezone.utc).isoformat()
     result["multi_period_evaluation"] = multi_period_result
