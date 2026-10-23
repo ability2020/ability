@@ -76,19 +76,35 @@ def fetch_candles(lookback_days=None):
         max_pages = int(math.ceil((window_end - window_start) / (interval_ms * (page_limit - 1)))) + 4
 
         for _ in range(max_pages):
-            response = requests.get(
-                BASE_URL + "/api/v3/market/history-candles",
-                params={
-                    "category": "SPOT",
-                    "symbol": SYMBOL,
-                    "interval": INTERVAL,
-                    "startTime": str(window_start),
-                    "endTime": str(cursor_end_ms),
-                    "limit": str(page_limit),
-                },
-                timeout=20,
-            )
-            response.raise_for_status()
+            params = {
+                "category": "SPOT",
+                "symbol": SYMBOL,
+                "interval": INTERVAL,
+                "startTime": str(window_start),
+                "endTime": str(cursor_end_ms),
+                "limit": str(page_limit),
+            }
+            # Historical backfills can make many requests. Pace them and retry
+            # transient rate limits instead of aborting the entire research run.
+            for attempt in range(5):
+                response = requests.get(
+                    BASE_URL + "/api/v3/market/history-candles",
+                    params=params,
+                    timeout=20,
+                )
+                if response.status_code not in (429, 418):
+                    response.raise_for_status()
+                    break
+                if attempt == 4:
+                    response.raise_for_status()
+                retry_after = response.headers.get("Retry-After")
+                try:
+                    delay = float(retry_after) if retry_after else min(2 ** attempt, 30)
+                except (TypeError, ValueError):
+                    delay = min(2 ** attempt, 30)
+                print(f"Bitget rate limit (HTTP {response.status_code}); retrying in {delay:.1f}s.")
+                time.sleep(max(1.0, delay))
+            time.sleep(0.2)
             payload = response.json()
             if payload.get("code") != "00000":
                 raise RuntimeError(
