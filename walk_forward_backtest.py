@@ -481,7 +481,15 @@ def walk_forward_evaluate(candles):
     # targets the immediately following candle, and thresholds are refreshed
     # periodically using only the historical training prefix available at i.
     selected_threshold = BUY_THRESHOLD
-    for i in range(MIN_SAMPLES, len(usable) - 1, WALK_FORWARD_STEP):
+    # Small synthetic/unit-test datasets may not contain enough rows for the
+    # configured sparse step. Reduce the stride when necessary so the evaluator
+    # can still produce its minimum 20 predictions whenever the data allows it.
+    available_prediction_rows = len(usable) - 1 - MIN_SAMPLES
+    effective_step = min(
+        WALK_FORWARD_STEP,
+        max(1, available_prediction_rows // 20),
+    )
+    for i in range(MIN_SAMPLES, len(usable) - 1, effective_step):
         train = usable.iloc[:i].dropna(subset=["target"])
         current = usable.iloc[[i]]
         if len(train) < MIN_SAMPLES or train["target"].nunique() < 2:
@@ -846,7 +854,11 @@ def main():
         if interval_ms else None
     )
     result["evaluation_runtime_settings"] = {
-        "walk_forward_step_candles": WALK_FORWARD_STEP,
+        "walk_forward_step_candles_configured": WALK_FORWARD_STEP,
+        "walk_forward_step_candles_effective": min(
+            WALK_FORWARD_STEP,
+            max(1, (len(build_feature_frame(candles).dropna(subset=["timestamp", "open", "high", "low", "close", "volume"])) - 1 - MIN_SAMPLES) // 20),
+        ),
         "threshold_refresh_every_predictions": THRESHOLD_REFRESH_PREDICTIONS,
         "note": "Predictions are sampled chronologically every N candles; each prediction still scores the immediately following candle. Threshold tuning is refreshed periodically using only the training prefix available at that point.",
     }
