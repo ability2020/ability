@@ -32,25 +32,87 @@ FEATURE_COLUMNS = [
 ]
 
 
-def fetch_candles():
-    response = requests.get(
-        BASE_URL + "/api/v3/market/candles",
-        params={
-            "category": "SPOT",
-            "symbol": SYMBOL,
-            "interval": INTERVAL,
-            "limit": str(CANDLE_LIMIT),
-        },
-        timeout=20,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    if payload.get("code") != "00000":
-        raise RuntimeError(
-            f"Bitget candle request failed ({payload.get('code')}): "
-            f"{payload.get('msg', 'unknown error')}"
+def fetch_candles(lookback_days=None):
+    """Fetch a chronological, deduplicated history of recent Spot candles.
+
+    The regular v3 candles endpoint supports at most 1,000 rows per request.
+    Page backwards by timestamp and cap the default lookback below 90 days;
+    older-than-90-day history requires Bitget's separate history-candles API.
+    """
+    import math
+    import time
+
+    if lookback_days is None:
+        lookback_days = int(os.getenv("CANDLE_LOOKBACK_DAYS", "60"))
+    if not isinstance(lookback_days, int) or not 1 <= lookback_days <= 89:
+        raise ValueError("CANDLE_LOOKBACK_DAYS must be an integer from 1 to 89 for the regular candles endpoint.")
+
+    interval_ms_by_name = {
+        "1m": 60_000, "3m": 180_000, "5m": 300_000,
+        "15m": 900_000, "30m": 1_800_000,
+        "1H": 3_600_000, "4H": 14_400_000,
+        "6H": 21_600_000, "12H": 43_200_000, "1D": 86_400_000,
+    }
+    if INTERVAL not in interval_ms_by_name:
+        raise ValueError(f"Unsupported candle interval for pagination: {INTERVAL}")
+
+    interval_ms = interval_ms_by_name[INTERVAL]
+    page_limit = 1000
+    end_ms = int(time.time() * 1000)
+    start_ms = end_ms - lookback_days * 24 * 60 * 60 * 1000
+    cursor_end_ms = end_ms
+    candles_by_timestamp = {}
+    max_pages = int(math.ceil(lookback_days * 24 * 60 * 60 * 1000 / (interval_ms * (page_limit - 1)))) + 3
+
+    for _ in range(max_pages):
+        response = requests.get(
+            BASE_URL + "/api/v3/market/candles",
+            params={
+                "category": "SPOT",
+                "symbol": SYMBOL,
+                "interval": INTERVAL,
+                "startTime": str(start_ms),
+                "endTime": str(cursor_end_ms),
+                "limit": str(page_limit),
+            },
+            timeout=20,
         )
-    return payload.get("data", [])
+        response.raise_for_status()
+        payload = response.json()
+        if payload.get("code") != "00000":
+            raise RuntimeError(
+                f"Bitget candle request failed ({payload.get('code')}): "
+                f"{payload.get('msg', 'unknown error')}"
+            )
+        page = payload.get("data", [])
+        if not isinstance(page, list) or not page:
+            break
+
+        valid_timestamps = []
+        for candle in page:
+            if not isinstance(candle, (list, tuple)) or not candle:
+                continue
+            try:
+                timestamp = int(candle[0])
+            except (TypeError, ValueError):
+                continue
+            if start_ms <= timestamp <= end_ms:
+                candles_by_timestamp[timestamp] = candle
+                valid_timestamps.append(timestamp)
+
+        if not valid_timestamps:
+            break
+        oldest_timestamp = min(valid_timestamps)
+        if oldest_timestamp <= start_ms:
+            break
+        next_cursor = oldest_timestamp - 1
+        if next_cursor >= cursor_end_ms:
+            raise RuntimeError("Bitget candle pagination made no backward progress.")
+        cursor_end_ms = next_cursor
+
+    if not candles_by_timestamp:
+        raise RuntimeError("Bitget returned no valid candles for the requested lookback.")
+    return [candles_by_timestamp[key] for key in sorted(candles_by_timestamp)]
 
 
 def build_feature_frame(candles):

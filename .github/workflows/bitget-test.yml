@@ -13,7 +13,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
 
     env:
       BITGET_API_KEY: ${{ secrets.BITGET_API_KEY }}
@@ -22,6 +22,7 @@ jobs:
       BITGET_SYMBOL: BTCUSDT
       BITGET_INTERVAL: 5m
       TRADE_AMOUNT_USDT: "10"
+      CANDLE_LOOKBACK_DAYS: "3"
 
     steps:
       - name: Checkout repository
@@ -42,15 +43,6 @@ jobs:
 
       - name: Train and evaluate experimental learning model (no orders)
         run: python learning_model.py
-
-      - name: Compare baseline and expanded features chronologically (no orders)
-        run: python feature_ablation.py
-
-      - name: Select model and threshold on validation data; test on untouched holdout (no orders)
-        run: python model_selection.py
-
-      - name: Walk-forward backtest with estimated fees and slippage (no orders)
-        run: python walk_forward_backtest.py
 
       - name: Check Bitget credentials
         run: |
@@ -431,6 +423,53 @@ jobs:
             multi_period_report.json
             feature_ablation_report.json
             model_selection_report.json
+          if-no-files-found: warn
+          retention-days: 30
+
+
+  historical-research:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      BITGET_SYMBOL: BTCUSDT
+      BITGET_INTERVAL: 5m
+      CANDLE_LOOKBACK_DAYS: "60"
+      BACKTEST_STAKE_USDT: "10"
+      BACKTEST_FEE_RATE: "0.001"
+      BACKTEST_SLIPPAGE_RATE: "0.0005"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compare baseline and expanded features chronologically (no orders)
+        run: python feature_ablation.py
+
+      - name: Select model and threshold on validation data; test on untouched holdout (no orders)
+        run: python model_selection.py
+
+      - name: Walk-forward backtest with estimated fees and slippage (no orders)
+        run: python walk_forward_backtest.py
+
+      - name: Upload historical research reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-research-run-${{ github.run_number }}
+          path: |
+            feature_ablation_report.json
+            model_selection_report.json
+            walk_forward_report.json
           if-no-files-found: warn
           retention-days: 30
 

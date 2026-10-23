@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import Mock, patch
 
 import numpy as np
 
@@ -49,6 +50,50 @@ class LearningModelTests(unittest.TestCase):
             report["test_sample_count"],
         )
         self.assertIn("does not control paper trades", report["safety_note"])
+
+    def test_fetch_candles_paginates_backwards_and_deduplicates(self):
+        def response(rows):
+            mocked = Mock()
+            mocked.raise_for_status.return_value = None
+            mocked.json.return_value = {"code": "00000", "data": rows}
+            return mocked
+
+        # fetch_candles anchors its range to the current time; these rows are
+        # relative to the first request's endTime, so they remain in-range.
+        def page_for_call(call_index, request_args):
+            end_time = int(request_args["params"]["endTime"])
+            if call_index == 0:
+                return response([
+                    [str(end_time - 300_000), "100", "101", "99", "100.5", "10", "0"],
+                    [str(end_time - 600_000), "100", "101", "99", "100.0", "10", "0"],
+                ])
+            if call_index == 1:
+                return response([
+                    [str(end_time - 300_000), "100", "101", "99", "100.0", "10", "0"],
+                    [str(end_time - 600_000), "99", "100", "98", "99.5", "10", "0"],
+                ])
+            return response([])
+
+        calls = []
+
+        def fake_get(*args, **kwargs):
+            calls.append(kwargs)
+            return page_for_call(len(calls) - 1, kwargs)
+
+        with patch.object(learning_model.requests, "get", side_effect=fake_get):
+            candles = learning_model.fetch_candles(lookback_days=1)
+
+        timestamps = [int(candle[0]) for candle in candles]
+        self.assertEqual(timestamps, sorted(set(timestamps)))
+        self.assertEqual(len(candles), 4)
+        self.assertGreaterEqual(len(calls), 2)
+        self.assertEqual(calls[0]["params"]["limit"], "1000")
+        self.assertIn("startTime", calls[0]["params"])
+        self.assertIn("endTime", calls[0]["params"])
+
+    def test_fetch_candles_rejects_lookback_outside_regular_endpoint_window(self):
+        with self.assertRaises(ValueError):
+            learning_model.fetch_candles(lookback_days=90)
 
     def test_rejects_too_little_data(self):
         with self.assertRaises(ValueError):
