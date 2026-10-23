@@ -29,6 +29,11 @@ STAKE_USDT = float(os.getenv("BACKTEST_STAKE_USDT", "10"))
 FEE_RATE = float(os.getenv("BACKTEST_FEE_RATE", "0.001"))  # 0.10% per side
 SLIPPAGE_RATE = float(os.getenv("BACKTEST_SLIPPAGE_RATE", "0.0005"))  # 0.05% per side
 
+# Runtime controls: sparse, chronological evaluation preserves the next-candle
+# target while avoiding an expensive model fit on every overlapping candle.
+WALK_FORWARD_STEP = int(os.getenv("WALK_FORWARD_STEP", "5"))
+THRESHOLD_REFRESH_PREDICTIONS = int(os.getenv("THRESHOLD_REFRESH_PREDICTIONS", "25"))
+
 
 def _validate_settings():
     if not (0.5 < BUY_THRESHOLD <= 1.0):
@@ -41,6 +46,10 @@ def _validate_settings():
         raise ValueError("BACKTEST_FEE_RATE must be finite and in [0, 0.1).")
     if not (0 <= SLIPPAGE_RATE < 0.1) or not np.isfinite(SLIPPAGE_RATE):
         raise ValueError("BACKTEST_SLIPPAGE_RATE must be finite and in [0, 0.1).")
+    if WALK_FORWARD_STEP < 1:
+        raise ValueError("WALK_FORWARD_STEP must be a positive integer.")
+    if THRESHOLD_REFRESH_PREDICTIONS < 1:
+        raise ValueError("THRESHOLD_REFRESH_PREDICTIONS must be a positive integer.")
 
 
 def _net_one_candle_return(entry_close, next_close):
@@ -468,7 +477,19 @@ def walk_forward_evaluate(candles):
 
     # At candle i close, labels for rows before i are known because they depend
     # only on closes through candle i. Candle i itself is never in training.
-    for i in range(MIN_SAMPLES, len(usable) - 1):
+    # Evaluate every Nth candle to reduce redundant fits; each prediction still
+    # targets the immediately following candle, and thresholds are refreshed
+    # periodically using only the historical training prefix available at i.
+    selected_threshold = BUY_THRESHOLD
+    # Small synthetic/unit-test datasets may not contain enough rows for the
+    # configured sparse step. Reduce the stride when necessary so the evaluator
+    # can still produce its minimum 20 predictions whenever the data allows it.
+    available_prediction_rows = len(usable) - 1 - MIN_SAMPLES
+    effective_step = min(
+        WALK_FORWARD_STEP,
+        max(1, available_prediction_rows // 20),
+    )
+    for i in range(MIN_SAMPLES, len(usable) - 1, effective_step):
         train = usable.iloc[:i].dropna(subset=["target"])
         current = usable.iloc[[i]]
         if len(train) < MIN_SAMPLES or train["target"].nunique() < 2:
@@ -479,7 +500,8 @@ def walk_forward_evaluate(candles):
         )
         model.fit(train[FEATURE_COLUMNS], train["target"].astype(int))
         probability_up = float(model.predict_proba(current[FEATURE_COLUMNS])[:, 1][0])
-        selected_threshold = _select_buy_threshold(train, usable)
+        if len(predictions) % THRESHOLD_REFRESH_PREDICTIONS == 0:
+            selected_threshold = _select_buy_threshold(train, usable)
         selected_thresholds.append(selected_threshold)
         actual_up = int(float(current.iloc[0]["close"]) < float(usable.iloc[i + 1]["close"]))
         predicted_up = int(probability_up >= 0.5)
@@ -831,6 +853,15 @@ def main():
         int(requested_lookback_days * 24 * 60 * 60 * 1000 / interval_ms)
         if interval_ms else None
     )
+    result["evaluation_runtime_settings"] = {
+        "walk_forward_step_candles_configured": WALK_FORWARD_STEP,
+        "walk_forward_step_candles_effective": min(
+            WALK_FORWARD_STEP,
+            max(1, (len(build_feature_frame(candles).dropna(subset=["timestamp", "open", "high", "low", "close", "volume"])) - 1 - MIN_SAMPLES) // 20),
+        ),
+        "threshold_refresh_every_predictions": THRESHOLD_REFRESH_PREDICTIONS,
+        "note": "Predictions are sampled chronologically every N candles; each prediction still scores the immediately following candle. Threshold tuning is refreshed periodically using only the training prefix available at that point.",
+    }
     result["candle_history_coverage"] = {
         "requested_lookback_days": requested_lookback_days,
         "actual_coverage_days": round((last_timestamp - first_timestamp) / 86_400_000, 3),
