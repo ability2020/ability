@@ -35,10 +35,10 @@ FEATURE_COLUMNS = [
 def fetch_candles(lookback_days=None):
     """Fetch and validate recent Spot candles in overlapping-safe 30-day windows.
 
-    Bitget's regular v3 candles endpoint returns at most 1,000 rows per request.
-    Splitting the requested range into 30-day windows avoids relying on a single
-    wide time-range query. Each window is paginated backwards, deduplicated, and
-    checked for minimum time coverage. This function only reads public market data.
+    Bitget's v3 historical candles endpoint returns at most 100 rows per request.
+    Each 30-day window is paginated backwards using its oldest returned timestamp,
+    deduplicated, and checked for minimum time coverage. This function only reads
+    public market data.
     """
     import math
     import time
@@ -58,7 +58,7 @@ def fetch_candles(lookback_days=None):
         raise ValueError(f"Unsupported candle interval for pagination: {INTERVAL}")
 
     interval_ms = interval_ms_by_name[INTERVAL]
-    page_limit = 1000
+    page_limit = 100
     now_ms = int(time.time() * 1000)
     end_ms = (now_ms // interval_ms) * interval_ms
     start_ms = end_ms - lookback_days * 24 * 60 * 60 * 1000
@@ -77,7 +77,7 @@ def fetch_candles(lookback_days=None):
 
         for _ in range(max_pages):
             response = requests.get(
-                BASE_URL + "/api/v3/market/candles",
+                BASE_URL + "/api/v3/market/history-candles",
                 params={
                     "category": "SPOT",
                     "symbol": SYMBOL,
