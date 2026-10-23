@@ -392,5 +392,36 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertFalse(result["real_money_trading_eligible"])
 
 
+    def test_cost_exit_diagnostics_report_exit_reason_pnl_and_cost_sensitivity(self):
+        trades = [
+            {
+                "exit_reason": "TAKE_PROFIT", "entry_price": 100.0, "exit_price": 103.0,
+                "gross_price_pnl_usdt": 0.3, "estimated_total_costs_usdt": 0.03,
+                "pnl_usdt": 0.27,
+            },
+            {
+                "exit_reason": "STOP_LOSS", "entry_price": 100.0, "exit_price": 98.0,
+                "gross_price_pnl_usdt": -0.2, "estimated_total_costs_usdt": 0.03,
+                "pnl_usdt": -0.23,
+            },
+        ]
+        result = walk_forward_backtest.summarize_exit_diagnostics(trades)
+        self.assertEqual(result["exit_pnl_by_reason"]["TAKE_PROFIT"]["trade_count"], 1)
+        self.assertAlmostEqual(result["exit_pnl_by_reason"]["TAKE_PROFIT"]["net_pnl_usdt"], 0.27)
+        self.assertAlmostEqual(result["exit_pnl_by_reason"]["STOP_LOSS"]["net_pnl_usdt"], -0.23)
+        sensitivity = result["cost_sensitivity"]
+        self.assertEqual(len(sensitivity["scenarios"]), 9)
+        self.assertGreater(sensitivity["break_even_gross_price_move_percent"], 0.0)
+        self.assertFalse(sensitivity["real_money_trading_eligible"])
+        self.assertTrue(all(not row["real_money_trading_eligible"] for row in sensitivity["scenarios"]))
+        low_cost = next(row for row in sensitivity["scenarios"]
+                        if row["fee_rate_each_side"] == 0.0005
+                        and row["slippage_rate_each_side"] == 0.0002)
+        high_cost = next(row for row in sensitivity["scenarios"]
+                         if row["fee_rate_each_side"] == 0.0015
+                         and row["slippage_rate_each_side"] == 0.001)
+        self.assertGreater(low_cost["net_pnl_usdt"], high_cost["net_pnl_usdt"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
