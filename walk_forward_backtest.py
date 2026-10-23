@@ -201,6 +201,60 @@ def _position_trade_with_cost_breakdown(position, exit_price, exit_execution, ex
         "net_return_percent": float(net_pnl / STAKE_USDT * 100.0),
     }
 
+def summarize_exit_diagnostics(trades):
+    """Research-only aggregation by exit reason and cost assumptions."""
+    by_reason = {}
+    for reason in ("STOP_LOSS", "TAKE_PROFIT", "SELL_SIGNAL", "END_OF_TEST"):
+        selected = [t for t in trades if t["exit_reason"] == reason]
+        by_reason[reason] = {
+            "trade_count": len(selected),
+            "gross_price_pnl_usdt": float(sum(t["gross_price_pnl_usdt"] for t in selected)),
+            "estimated_total_costs_usdt": float(sum(t["estimated_total_costs_usdt"] for t in selected)),
+            "net_pnl_usdt": float(sum(t["pnl_usdt"] for t in selected)),
+            "profitable_trade_count": sum(t["pnl_usdt"] > 0 for t in selected),
+        }
+    scenarios = []
+    for fee in (0.0005, 0.001, 0.0015):
+        for slip in (0.0002, 0.0005, 0.001):
+            gross_total = costs_total = net_total = 0.0
+            wins = 0
+            for trade in trades:
+                entry = float(trade["entry_price"])
+                exit_price = float(trade["exit_price"])
+                entry_exec = entry * (1 + slip)
+                exit_exec = exit_price * (1 - slip)
+                qty = STAKE_USDT / entry_exec
+                gross = qty * (exit_price - entry)
+                costs = STAKE_USDT * fee + qty * exit_exec * fee
+                costs += qty * (entry_exec - entry) + qty * (exit_price - exit_exec)
+                net = gross - costs
+                gross_total += gross
+                costs_total += costs
+                net_total += net
+                wins += net > 0
+            scenarios.append({
+                "fee_rate_each_side": fee, "slippage_rate_each_side": slip,
+                "trade_count": len(trades), "gross_price_pnl_usdt": float(gross_total),
+                "estimated_total_costs_usdt": float(costs_total), "net_pnl_usdt": float(net_total),
+                "profitable_trade_count": int(wins), "real_money_trading_eligible": False,
+            })
+    entry_exec = 1.0 * (1 + SLIPPAGE_RATE)
+    quantity = STAKE_USDT / entry_exec
+    break_even_exit = (STAKE_USDT + STAKE_USDT * FEE_RATE) / (
+        quantity * (1 - SLIPPAGE_RATE) * (1 - FEE_RATE)
+    )
+    return {
+        "exit_pnl_by_reason": by_reason,
+        "cost_sensitivity": {
+            "base_fee_rate_each_side": FEE_RATE,
+            "base_slippage_rate_each_side": SLIPPAGE_RATE,
+            "break_even_gross_price_move_percent": (break_even_exit - 1.0) * 100.0,
+            "scenarios": scenarios,
+            "real_money_trading_eligible": False,
+        },
+    }
+
+
 def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_profit_percent=3.0):
     """Simulate one long Spot position using every subsequent candle's OHLC.
 
@@ -352,6 +406,8 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
             reason: sum(trade["exit_reason"] == reason for trade in trades)
             for reason in ("STOP_LOSS", "TAKE_PROFIT", "SELL_SIGNAL", "END_OF_TEST")
         },
+        "position_strategy_exit_pnl_by_reason": summarize_exit_diagnostics(trades)["exit_pnl_by_reason"],
+        "position_strategy_cost_sensitivity": summarize_exit_diagnostics(trades)["cost_sensitivity"],
         "position_strategy_trades_sample": trades[-20:],
         "position_strategy_method": (
             "Long-only Spot simulation, one position at a time. Entry at signal candle close; "
