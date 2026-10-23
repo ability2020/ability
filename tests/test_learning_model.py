@@ -60,9 +60,9 @@ class LearningModelTests(unittest.TestCase):
 
         def fake_get(url, **kwargs):
             params = kwargs["params"]
-            self.assertTrue(url.endswith("/api/v3/market/candles"))
+            self.assertTrue(url.endswith("/api/v3/market/history-candles"))
             self.assertEqual(params["category"], "SPOT")
-            self.assertEqual(params["limit"], "1000")
+            self.assertEqual(params["limit"], "100")
             start_ms = int(params["startTime"])
             end_ms = int(params["endTime"])
             interval_ms = 300_000
@@ -71,9 +71,11 @@ class LearningModelTests(unittest.TestCase):
                 rows.append([
                     str(timestamp), "100", "101", "99", "100.5", "10", "0"
                 ])
+            # Endpoint returns the newest 100 rows in the requested time range.
+            rows = rows[-100:]
             # Add a duplicate timestamp to verify de-duplication.
-            rows.append(rows[len(rows) // 2].copy())
-            return response(list(reversed(rows)))
+            rows.append(rows[-1].copy())
+            return response(list(reversed(rows)) )
 
         with patch.object(learning_model.requests, "get", side_effect=fake_get):
             candles = learning_model.fetch_candles(lookback_days=1)
