@@ -201,9 +201,10 @@ jobs:
               signal, price, details, usdt_balance, btc_balance
           )
           state = paper_trader.load_state()
+          paper_signal = paper_trader.risk_gated_paper_signal(signal, risk_decision)
           updated, event, reason = paper_trader.process_cycle(
               state,
-              signal,
+              paper_signal,
               price,
               trade_amount_usdt=main.TRADE_AMOUNT_USDT,
               stop_loss_percent=main.STOP_LOSS_PERCENT,
@@ -233,22 +234,24 @@ jobs:
               "signal_reason": details.get("reason"),
               "risk_decision": risk_decision,
               "risk_reason": risk_reason,
-              "risk_decision_scope": "Exchange-account candidate check only; it does not control the offline paper simulator.",
-              "paper_trading_mode": "Independent simulated position; no exchange order is sent.",
+              "risk_decision_scope": "BUY entries require BUY_CANDIDATE; SELL may close an existing hypothetical paper position because real BTC balance is separate from simulated holdings.",
+              "paper_trading_mode": "Risk-gated hypothetical position; no exchange order is sent.",
+              "paper_signal": paper_signal,
               "paper_event": event,
               "paper_event_reason": reason,
               "simulated_realized_pnl_usdt_gross": updated["realized_pnl_usdt"],
               "closed_trade_count": len(updated["closed_trades"]),
               "open_position": updated["position"],
-              "note": "Signal from retrieved market data. Paper simulation uses its own hypothetical position and is independent of real BTC/USDT account balances. No exchange order was sent."
+              "note": "Signal from retrieved market data. Hypothetical BUY entries are blocked unless the risk engine returns BUY_CANDIDATE. A SELL signal can close an existing simulated position independently of real BTC holdings. No exchange order was sent."
           }
           with open("paper_signal.json", "w", encoding="utf-8") as file:
               json.dump(signal_record, file, indent=2, allow_nan=False)
 
           print("PAPER-TRADING ONLY — no Bitget order endpoint called.")
-          print("Signal:", signal)
+          print("Market indicator signal:", signal)
           print("Exchange-account risk candidate:", risk_decision, "—", risk_reason)
-          print("Paper simulation uses its own hypothetical position, independent of real account balances.")
+          print("Risk-gated paper signal:", paper_signal)
+          print("Paper BUY entries require BUY_CANDIDATE; paper SELL can close an existing simulated position.")
           print("Paper event:", event)
           print("Reason:", reason)
           print("Simulated realized PnL (USDT):", round(updated["realized_pnl_usdt"], 6))
