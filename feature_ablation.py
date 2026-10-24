@@ -8,7 +8,7 @@ from sklearn.metrics import accuracy_score, balanced_accuracy_score, brier_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from learning_model import FEATURE_COLUMNS, build_feature_frame, fetch_candles
+from learning_model import FEATURE_COLUMNS, INTERVAL, SYMBOL, build_feature_frame, fetch_candles
 
 BASELINE_FEATURES = [
     "return_1", "return_3", "return_6",
@@ -164,8 +164,8 @@ def compare_feature_sets(candles, fold_count=3):
         "report_type": "chronological-feature-ablation",
         "available": bool(baseline.get("available") and expanded.get("available")),
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "symbol": "BTCUSDT",
-        "interval": "5m",
+        "symbol": SYMBOL,
+        "interval": INTERVAL,
         "usable_candle_count": int(len(usable)),
         "method": "Expanding chronological training windows; test windows occur strictly after training. Reports BUY thresholds 0.55, 0.58, and 0.62 as diagnostics only; estimated 0.10% fee and 0.05% slippage per side; fixed 10 USDT stake.",
         "baseline_features": baseline,
