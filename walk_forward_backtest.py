@@ -287,7 +287,7 @@ def summarize_exit_diagnostics(trades):
     }
 
 
-def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_profit_percent=3.0):
+def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_profit_percent=3.0, minimum_favorable_move_before_sell_percent=0.0):
     """Simulate one long Spot position using every subsequent candle's OHLC.
 
     Entries use the signal candle close; exits are checked on every later candle,
@@ -297,15 +297,18 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
     try:
         stop_loss_percent = float(stop_loss_percent)
         take_profit_percent = float(take_profit_percent)
+        minimum_favorable_move_before_sell_percent = float(minimum_favorable_move_before_sell_percent)
     except (TypeError, ValueError) as error:
-        raise ValueError("Stop loss and take profit must be numeric.") from error
+        raise ValueError("Stop loss, take profit, and minimum favorable move must be numeric.") from error
     if not (
         np.isfinite(stop_loss_percent)
         and np.isfinite(take_profit_percent)
         and 0 < stop_loss_percent < 100
         and take_profit_percent > 0
+        and np.isfinite(minimum_favorable_move_before_sell_percent)
+        and minimum_favorable_move_before_sell_percent >= 0
     ):
-        raise ValueError("Stop loss must be finite and in (0, 100); take profit must be positive and finite.")
+        raise ValueError("Stop loss must be in (0, 100), take profit positive, and minimum favorable move non-negative; all must be finite.")
 
     index_by_timestamp = {
         int(row["timestamp"]): idx for idx, (_, row) in enumerate(usable.iterrows())
@@ -373,7 +376,11 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
                 exit_reason = "STOP_LOSS"
             elif target_touched:
                 exit_price, exit_reason = target_price, "TAKE_PROFIT"
-            elif signal == "SELL":
+            elif (
+                signal == "SELL"
+                and (position["maximum_holding_high"] / entry - 1.0) * 100.0
+                >= minimum_favorable_move_before_sell_percent
+            ):
                 exit_price, exit_reason = float(row["close"]), "SELL_SIGNAL"
 
             if exit_price is not None:
@@ -477,6 +484,7 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
         "real_money_trading_eligible": False,
         "position_strategy_stop_loss_percent": stop_loss_percent,
         "position_strategy_take_profit_percent": take_profit_percent,
+        "position_strategy_minimum_favorable_move_before_sell_percent": minimum_favorable_move_before_sell_percent,
         "position_strategy_trade_count": len(trades),
         "position_strategy_maximum_drawdown_usdt": summarize_fixed_stake_drawdown([trade["pnl_usdt"] / STAKE_USDT for trade in trades])["maximum_drawdown_usdt"],
         "position_strategy_closed_trade_pnl_usdt": total_pnl,
@@ -768,6 +776,7 @@ def walk_forward_evaluate(candles):
     )
     position_strategy = simulate_position_strategy(usable, predictions)
     stop_loss_comparison = compare_stop_loss_scenarios(usable, predictions)
+    controlled_exit_policy_comparison = compare_controlled_exit_policies(usable, predictions)
     holding_period_analysis = analyze_holding_periods(usable, predictions)
     regime_filter_comparison = compare_bullish_regime_filter(predictions)
     net_total_return = float(np.prod([1.0 + r for r in trade_returns]) - 1.0) if trade_returns else 0.0
@@ -839,6 +848,7 @@ def walk_forward_evaluate(candles):
         "holding_period_cost_analysis": holding_period_analysis,
         "bullish_regime_filter_comparison": regime_filter_comparison,
         "controlled_stop_loss_comparison": stop_loss_comparison,
+        "controlled_exit_policy_comparison": controlled_exit_policy_comparison,
         "sample_predictions": predictions[-10:],
     }
 
@@ -1037,6 +1047,65 @@ def analyze_holding_periods(usable, predictions, holding_periods=(1, 3, 6, 12)):
         "holding_periods": summaries,
         "real_money_trading_eligible": False,
     }
+
+def compare_controlled_exit_policies(usable, predictions):
+    """Compare predeclared exit-only alternatives on identical out-of-sample BUY/SELL signals."""
+    scenarios = []
+
+    def record(name, category, stop_percent, target_percent, minimum_favorable_move):
+        result = simulate_position_strategy(
+            usable, predictions,
+            stop_loss_percent=stop_percent,
+            take_profit_percent=target_percent,
+            minimum_favorable_move_before_sell_percent=minimum_favorable_move,
+        )
+        scenarios.append({
+            "scenario": name,
+            "category": category,
+            "stop_loss_percent": float(stop_percent),
+            "take_profit_percent": float(target_percent),
+            "minimum_favorable_move_before_sell_percent": float(minimum_favorable_move),
+            "trade_count": result["position_strategy_trade_count"],
+            "net_pnl_usdt": result["position_strategy_closed_trade_pnl_usdt"],
+            "gross_price_pnl_usdt": result["position_strategy_gross_price_pnl_usdt"],
+            "estimated_total_costs_usdt": result["position_strategy_estimated_total_costs_usdt"],
+            "average_net_return_percent_per_trade": result["position_strategy_average_net_return_percent_per_trade"],
+            "win_rate_percent": result["position_strategy_win_rate_percent"],
+            "maximum_drawdown_usdt": result["position_strategy_maximum_drawdown_usdt"],
+            "exit_reasons": result["position_strategy_exit_reasons"],
+            "real_money_trading_eligible": False,
+        })
+
+    # Baseline and each family change one exit dimension at a time.
+    record("baseline_SL2_TP3_sell0", "baseline", 2.0, 3.0, 0.0)
+    for target in (2.0, 3.0, 4.0, 5.0):
+        record(f"take_profit_{target:g}_percent", "take_profit", 2.0, target, 0.0)
+    for minimum_move in (0.5, 1.0, 1.5):
+        record(
+            f"sell_signal_after_favorable_move_{minimum_move:g}_percent",
+            "sell_signal_filter", 2.0, 3.0, minimum_move,
+        )
+
+    baseline = scenarios[0]
+    return {
+        "report_type": "experimental-controlled-exit-policy-comparison",
+        "method": (
+            "Research-only comparison on identical chronological out-of-sample predictions and entry signals. "
+            "Each scenario changes one exit dimension at a time; the 2% stop/3% target baseline is included. "
+            "Stops and targets are checked on every later OHLC candle, with stop-loss assumed first if both "
+            "levels are touched. SELL-signal filters use the maximum favorable high observed since entry, "
+            "known at the candle being evaluated. Fixed stake, fees, and slippage are held constant."
+        ),
+        "baseline_scenario": baseline,
+        "scenarios": scenarios,
+        "comparison_warning": (
+            "Scenarios share the same historical sample and are not independent validation. Do not select a "
+            "winner from this report alone; repeat on later unseen periods and check sample size and drawdown."
+        ),
+        "real_money_trading_eligible": False,
+        "orders_submitted": False,
+    }
+
 
 
 def main():
