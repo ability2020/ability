@@ -26,6 +26,28 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIsNone(state["position"])
         self.assertEqual(event, "HOLD_CASH")
 
+    def test_buy_is_blocked_when_risk_decision_is_wait(self):
+        self.assertEqual(paper_trader.risk_gated_paper_signal("BUY", "WAIT"), "WAIT")
+        state, event, _ = paper_trader.process_cycle(
+            paper_trader.default_state(),
+            paper_trader.risk_gated_paper_signal("BUY", "WAIT"),
+            100.0,
+            10.0,
+        )
+        self.assertEqual(event, "HOLD_CASH")
+        self.assertIsNone(state["position"])
+
+    def test_buy_is_allowed_only_for_risk_candidate(self):
+        self.assertEqual(
+            paper_trader.risk_gated_paper_signal("BUY", "BUY_CANDIDATE"),
+            "BUY",
+        )
+
+    def test_sell_can_close_hypothetical_position_without_real_btc_candidate(self):
+        # Real-account balance checks must not prevent a paper exit from an
+        # already-open simulated position.
+        self.assertEqual(paper_trader.risk_gated_paper_signal("SELL", "WAIT"), "SELL")
+
     def test_stop_loss_closes_position_and_records_loss(self):
         state, _, _ = paper_trader.process_cycle(
             paper_trader.default_state(), "BUY", 100.0, 10.0, 2.0, 3.0

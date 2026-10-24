@@ -11,7 +11,7 @@ from sklearn.metrics import accuracy_score, balanced_accuracy_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from learning_model import FEATURE_COLUMNS, build_feature_frame, fetch_candles
+from learning_model import FEATURE_COLUMNS, INTERVAL, SYMBOL, build_feature_frame, fetch_candles
 
 BASELINE_FEATURES = [
     "return_1", "return_3", "return_6",
@@ -208,8 +208,8 @@ def evaluate_model_selection(candles):
         "report_type": "validation-selected-model-cost-aware-holdout",
         "available": True,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "symbol": "BTCUSDT",
-        "interval": "5m",
+        "symbol": SYMBOL,
+        "interval": INTERVAL,
         "usable_labelled_candle_count": n,
         "split": {
             "training_count": len(train),
