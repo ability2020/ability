@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 import feature_ablation
 
@@ -43,6 +44,11 @@ class FeatureAblationTests(unittest.TestCase):
             for diagnostic in result["threshold_diagnostics"].values():
                 self.assertGreaterEqual(diagnostic["buy_signal_count"], 0)
                 self.assertGreaterEqual(diagnostic["max_fold_drawdown_usdt"], 0)
+
+    def test_report_interval_uses_configured_interval(self):
+        with patch.object(feature_ablation, "INTERVAL", "4H"):
+            report = feature_ablation.compare_feature_sets(make_candles(500), fold_count=3)
+        self.assertEqual(report["interval"], "4H")
 
     def test_reports_insufficient_data_safely(self):
         report = feature_ablation.compare_feature_sets(make_candles(100))
