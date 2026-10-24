@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 import model_selection
 
@@ -33,6 +34,11 @@ class ModelSelectionTests(unittest.TestCase):
         self.assertIn("model_diagnostics_at_fixed_threshold", report["holdout"])
         self.assertFalse(report["real_money_trading_eligible"])
         self.assertFalse(report["orders_sent"])
+
+    def test_report_interval_uses_configured_interval(self):
+        with patch.object(model_selection, "INTERVAL", "1H"):
+            report = model_selection.evaluate_model_selection(make_candles(500))
+        self.assertEqual(report["interval"], "1H")
 
     def test_reports_insufficient_data_without_live_eligibility(self):
         report = model_selection.evaluate_model_selection(make_candles(100))
