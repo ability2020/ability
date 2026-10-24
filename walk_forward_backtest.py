@@ -398,8 +398,10 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
                 "entry_fee": STAKE_USDT * FEE_RATE,
                 "entry_probability_up": probability_by_index.get(i),
                 "holding_candle_count": 0,
-                "minimum_holding_low": float(row["low"]),
-                "maximum_holding_high": float(row["high"]),
+                # Entry occurs at candle close, so do not count that candle's
+                # earlier high/low as post-entry excursion.
+                "minimum_holding_low": entry_reference,
+                "maximum_holding_high": entry_reference,
                 "entry_candle_range_percent": (
                     (float(row["high"]) - float(row["low"])) / entry_reference * 100.0
                     if entry_reference > 0 else None
