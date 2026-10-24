@@ -199,6 +199,38 @@ def _position_trade_with_cost_breakdown(position, exit_price, exit_execution, ex
         "estimated_total_costs_usdt": float(entry_fee + exit_fee + entry_slippage + exit_slippage),
         "pnl_usdt": float(net_pnl),
         "net_return_percent": float(net_pnl / STAKE_USDT * 100.0),
+        "entry_probability_up": position.get("entry_probability_up"),
+        "holding_candle_count": int(position.get("holding_candle_count", 0)),
+        "max_adverse_excursion_percent": (
+            float((position["minimum_holding_low"] / entry_price - 1.0) * 100.0)
+            if position.get("minimum_holding_low") is not None else None
+        ),
+        "max_favorable_excursion_percent": (
+            float((position["maximum_holding_high"] / entry_price - 1.0) * 100.0)
+            if position.get("maximum_holding_high") is not None else None
+        ),
+        "entry_candle_range_percent": position.get("entry_candle_range_percent"),
+        "average_holding_candle_range_percent": (
+            float(position["holding_candle_range_sum_percent"] / position["holding_candle_count"])
+            if position.get("holding_candle_count", 0) else None
+        ),
+        "stop_distance_in_average_holding_ranges": (
+            float((position["stop_loss_percent"] / (
+                position["holding_candle_range_sum_percent"] / position["holding_candle_count"]
+            )))
+            if position.get("holding_candle_count", 0)
+            and position.get("holding_candle_range_sum_percent", 0.0) > 0
+            and exit_reason == "STOP_LOSS" else None
+        ),
+        "stop_gap_exit": bool(
+            exit_reason == "STOP_LOSS"
+            and position.get("stop_price") is not None
+            and float(exit_price) < float(position["stop_price"])
+        ),
+        "stop_gap_beyond_level_percent": (
+            float((float(exit_price) / float(position["stop_price"]) - 1.0) * 100.0)
+            if exit_reason == "STOP_LOSS" and position.get("stop_price") is not None else None
+        ),
     }
 
 def summarize_exit_diagnostics(trades):
@@ -284,6 +316,12 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
         if int(pred["timestamp"]) in index_by_timestamp
         and pred.get("signal") in ("BUY", "SELL", "WAIT")
     }
+    probability_by_index = {
+        index_by_timestamp[int(pred["timestamp"])]: float(pred["probability_up"])
+        for pred in predictions
+        if int(pred["timestamp"]) in index_by_timestamp
+        and pred.get("probability_up") is not None
+    }
     position = None
     trades = []
     checked_position_candles = 0
@@ -308,6 +346,12 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
             low = float(row["low"])
             high = float(row["high"])
             checked_position_candles += 1
+            position["stop_price"] = stop_price
+            position["holding_candle_count"] += 1
+            position["minimum_holding_low"] = min(position["minimum_holding_low"], low)
+            position["maximum_holding_high"] = max(position["maximum_holding_high"], high)
+            candle_range_percent = ((high - low) / entry * 100.0) if entry > 0 else 0.0
+            position["holding_candle_range_sum_percent"] += candle_range_percent
             if i not in signal_by_index:
                 missing_prediction_position_candles += 1
             stop_touched = low <= stop_price
@@ -352,6 +396,17 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
                 "entry_execution": entry_execution,
                 "quantity": STAKE_USDT / entry_execution,
                 "entry_fee": STAKE_USDT * FEE_RATE,
+                "entry_probability_up": probability_by_index.get(i),
+                "holding_candle_count": 0,
+                "minimum_holding_low": float(row["low"]),
+                "maximum_holding_high": float(row["high"]),
+                "entry_candle_range_percent": (
+                    (float(row["high"]) - float(row["low"])) / entry_reference * 100.0
+                    if entry_reference > 0 else None
+                ),
+                "holding_candle_range_sum_percent": 0.0,
+                "stop_loss_percent": stop_loss_percent,
+                "stop_price": entry_reference * (1.0 - stop_loss_percent / 100.0),
             }
 
     if position is not None:
@@ -365,6 +420,57 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
         ))
 
     total_pnl = float(sum(trade["pnl_usdt"] for trade in trades))
+    stop_trades = [trade for trade in trades if trade["exit_reason"] == "STOP_LOSS"]
+
+    def _mean_or_none(values):
+        return float(np.mean(values)) if values else None
+
+    probability_bands = (
+        ("below_0_55", lambda p: p is not None and p < 0.55),
+        ("0_55_to_0_58", lambda p: p is not None and 0.55 <= p < 0.58),
+        ("0_58_to_0_62", lambda p: p is not None and 0.58 <= p < 0.62),
+        ("0_62_and_above", lambda p: p is not None and p >= 0.62),
+        ("missing_probability", lambda p: p is None),
+    )
+    stop_loss_diagnostics = {
+        "stop_loss_trade_count": len(stop_trades),
+        "stop_gap_exit_count": sum(bool(t["stop_gap_exit"]) for t in stop_trades),
+        "non_gap_stop_exit_count": sum(not bool(t["stop_gap_exit"]) for t in stop_trades),
+        "mean_holding_candles_before_stop": _mean_or_none([t["holding_candle_count"] for t in stop_trades]),
+        "mean_max_adverse_excursion_percent": _mean_or_none([t["max_adverse_excursion_percent"] for t in stop_trades if t["max_adverse_excursion_percent"] is not None]),
+        "mean_max_favorable_excursion_percent": _mean_or_none([t["max_favorable_excursion_percent"] for t in stop_trades if t["max_favorable_excursion_percent"] is not None]),
+        "mean_entry_candle_range_percent": _mean_or_none([t["entry_candle_range_percent"] for t in stop_trades if t["entry_candle_range_percent"] is not None]),
+        "mean_holding_candle_range_percent": _mean_or_none([t["average_holding_candle_range_percent"] for t in stop_trades if t["average_holding_candle_range_percent"] is not None]),
+        "mean_stop_distance_in_average_holding_ranges": _mean_or_none([t["stop_distance_in_average_holding_ranges"] for t in stop_trades if t["stop_distance_in_average_holding_ranges"] is not None]),
+        "by_entry_probability_band": {
+            label: {
+                "stop_loss_trade_count": sum(matches(t.get("entry_probability_up")) for t in stop_trades),
+                "net_pnl_usdt": float(sum(t["pnl_usdt"] for t in stop_trades if matches(t.get("entry_probability_up")))),
+                "mean_holding_candles": _mean_or_none([t["holding_candle_count"] for t in stop_trades if matches(t.get("entry_probability_up"))]),
+                "mean_max_adverse_excursion_percent": _mean_or_none([t["max_adverse_excursion_percent"] for t in stop_trades if matches(t.get("entry_probability_up")) and t["max_adverse_excursion_percent"] is not None]),
+            }
+            for label, matches in probability_bands
+        },
+        "stop_loss_trade_details": [
+            {key: trade.get(key) for key in (
+                "entry_timestamp", "exit_timestamp", "entry_price", "exit_price",
+                "entry_probability_up", "holding_candle_count",
+                "max_adverse_excursion_percent", "max_favorable_excursion_percent",
+                "entry_candle_range_percent", "average_holding_candle_range_percent",
+                "stop_distance_in_average_holding_ranges", "stop_gap_exit",
+                "stop_gap_beyond_level_percent", "gross_price_pnl_usdt",
+                "estimated_total_costs_usdt", "pnl_usdt"
+            )}
+            for trade in stop_trades
+        ],
+        "interpretation_note": (
+            "Descriptive diagnostics on the same chronological walk-forward position simulation. "
+            "Entry probability is the model probability recorded at the BUY candle; holding-candle "
+            "ranges use high-low divided by entry price. This does not test alternative stop settings "
+            "or prove that a wider stop would improve out-of-sample results."
+        ),
+        "real_money_trading_eligible": False,
+    }
     return {
         "real_money_trading_eligible": False,
         "position_strategy_stop_loss_percent": stop_loss_percent,
@@ -407,6 +513,7 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
             for reason in ("STOP_LOSS", "TAKE_PROFIT", "SELL_SIGNAL", "END_OF_TEST")
         },
         "position_strategy_exit_pnl_by_reason": summarize_exit_diagnostics(trades)["exit_pnl_by_reason"],
+        "position_strategy_stop_loss_diagnostics": stop_loss_diagnostics,
         "position_strategy_cost_sensitivity": summarize_exit_diagnostics(trades)["cost_sensitivity"],
         "position_strategy_trades_sample": trades[-20:],
         "position_strategy_method": (
