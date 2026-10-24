@@ -69,6 +69,21 @@ def save_state(state, path=PAPER_STATE_FILE):
             os.unlink(temp_path)
 
 
+
+def risk_gated_paper_signal(signal, risk_decision):
+    """Gate hypothetical BUY entries on the risk engine; preserve paper exits.
+
+    The risk engine checks real account balances, so SELL is still allowed to
+    close an existing hypothetical paper position even when the real account
+    has no BTC. No exchange order is submitted by this helper.
+    """
+    if signal not in ("BUY", "SELL", "WAIT"):
+        return "WAIT"
+    if signal == "BUY" and risk_decision != "BUY_CANDIDATE":
+        return "WAIT"
+    return signal
+
+
 def process_cycle(state, signal, price, trade_amount_usdt=10.0,
                   stop_loss_percent=2.0, take_profit_percent=3.0):
     """Update hypothetical state only; never makes a network request."""
