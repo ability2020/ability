@@ -478,6 +478,7 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
         "position_strategy_stop_loss_percent": stop_loss_percent,
         "position_strategy_take_profit_percent": take_profit_percent,
         "position_strategy_trade_count": len(trades),
+        "position_strategy_maximum_drawdown_usdt": summarize_fixed_stake_drawdown([trade["pnl_usdt"] / STAKE_USDT for trade in trades])["maximum_drawdown_usdt"],
         "position_strategy_closed_trade_pnl_usdt": total_pnl,
         "position_strategy_gross_price_pnl_usdt": float(sum(trade["gross_price_pnl_usdt"] for trade in trades)),
         "position_strategy_estimated_entry_fees_usdt": float(sum(trade["estimated_entry_fee_usdt"] for trade in trades)),
@@ -548,9 +549,7 @@ def compare_stop_loss_scenarios(usable, predictions, take_profit_percent=3.0):
             "estimated_total_costs_usdt": result["position_strategy_estimated_total_costs_usdt"],
             "average_net_return_percent_per_trade": result["position_strategy_average_net_return_percent_per_trade"],
             "win_rate_percent": result["position_strategy_win_rate_percent"],
-            "maximum_drawdown_usdt": summarize_fixed_stake_drawdown(
-                [float(t["net_return_percent"]) / 100.0 for t in result["position_strategy_trades_sample"]]
-            )["maximum_drawdown_usdt"],
+            "maximum_drawdown_usdt": result["position_strategy_maximum_drawdown_usdt"],
             "exit_reasons": result["position_strategy_exit_reasons"],
             "stop_loss_diagnostics": result["position_strategy_stop_loss_diagnostics"],
             "real_money_trading_eligible": False,
