@@ -344,8 +344,46 @@ class WalkForwardBacktestTests(unittest.TestCase):
         self.assertEqual(trade["exit_reason"], "STOP_LOSS")
         self.assertAlmostEqual(trade["exit_price"], 95.0)
         self.assertEqual(result["position_strategy_stop_gap_candle_count"], 1)
+        self.assertTrue(trade["stop_gap_exit"])
+        self.assertAlmostEqual(trade["stop_gap_beyond_level_percent"], (95.0 / 98.0 - 1.0) * 100.0)
+        diagnostics = result["position_strategy_stop_loss_diagnostics"]
+        self.assertEqual(diagnostics["stop_gap_exit_count"], 1)
         self.assertFalse(result["real_money_trading_eligible"])
 
+
+    def test_stop_loss_diagnostics_capture_signal_strength_excursion_and_volatility(self):
+        import pandas as pd
+
+        usable = pd.DataFrame([
+            {"timestamp": 1, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+            {"timestamp": 2, "open": 100.0, "high": 101.0, "low": 99.5, "close": 100.2},
+            {"timestamp": 3, "open": 100.2, "high": 101.0, "low": 97.0, "close": 98.0},
+        ])
+        result = walk_forward_backtest.simulate_position_strategy(
+            usable,
+            [
+                {"timestamp": 1, "signal": "BUY", "probability_up": 0.61},
+                {"timestamp": 2, "signal": "WAIT", "probability_up": 0.53},
+                {"timestamp": 3, "signal": "WAIT", "probability_up": 0.49},
+            ],
+            stop_loss_percent=2.0,
+            take_profit_percent=3.0,
+        )
+        trade = result["position_strategy_trades_sample"][0]
+        self.assertEqual(trade["exit_reason"], "STOP_LOSS")
+        self.assertAlmostEqual(trade["entry_probability_up"], 0.61)
+        self.assertEqual(trade["holding_candle_count"], 2)
+        self.assertAlmostEqual(trade["max_adverse_excursion_percent"], -3.0)
+        self.assertAlmostEqual(trade["max_favorable_excursion_percent"], 1.0)
+        self.assertAlmostEqual(trade["entry_candle_range_percent"], 2.0)
+        self.assertAlmostEqual(trade["average_holding_candle_range_percent"], 2.75)
+        self.assertAlmostEqual(trade["stop_distance_in_average_holding_ranges"], 2.0 / 2.75)
+        diagnostics = result["position_strategy_stop_loss_diagnostics"]
+        self.assertEqual(diagnostics["stop_loss_trade_count"], 1)
+        self.assertEqual(diagnostics["stop_gap_exit_count"], 0)
+        self.assertEqual(diagnostics["by_entry_probability_band"]["0_58_to_0_62"]["stop_loss_trade_count"], 1)
+        self.assertFalse(diagnostics["real_money_trading_eligible"])
+        self.assertFalse(result["real_money_trading_eligible"])
 
     def test_holding_period_analysis_compares_non_overlapping_after_cost_returns(self):
         import pandas as pd
