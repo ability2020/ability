@@ -528,6 +528,43 @@ def simulate_position_strategy(usable, predictions, stop_loss_percent=2.0, take_
     }
 
 
+
+def compare_stop_loss_scenarios(usable, predictions, take_profit_percent=3.0):
+    """Compare predeclared stop distances on identical signals; descriptive research only."""
+    scenarios = []
+    # Fixed in advance, symmetric target across scenarios, no selection/tuning.
+    for stop_percent in (1.0, 1.5, 2.0, 2.5, 3.0, 4.0):
+        result = simulate_position_strategy(
+            usable, predictions,
+            stop_loss_percent=stop_percent,
+            take_profit_percent=take_profit_percent,
+        )
+        scenarios.append({
+            "stop_loss_percent": stop_percent,
+            "take_profit_percent": float(take_profit_percent),
+            "trade_count": result["position_strategy_trade_count"],
+            "net_pnl_usdt": result["position_strategy_closed_trade_pnl_usdt"],
+            "gross_price_pnl_usdt": result["position_strategy_gross_price_pnl_usdt"],
+            "estimated_total_costs_usdt": result["position_strategy_estimated_total_costs_usdt"],
+            "average_net_return_percent_per_trade": result["position_strategy_average_net_return_percent_per_trade"],
+            "win_rate_percent": result["position_strategy_win_rate_percent"],
+            "maximum_drawdown_usdt": summarize_fixed_stake_drawdown(
+                [float(t["net_return_percent"]) / 100.0 for t in result["position_strategy_trades_sample"]]
+            )["maximum_drawdown_usdt"],
+            "exit_reasons": result["position_strategy_exit_reasons"],
+            "stop_loss_diagnostics": result["position_strategy_stop_loss_diagnostics"],
+            "real_money_trading_eligible": False,
+        })
+    return {
+        "report_type": "research-only-controlled-stop-loss-comparison",
+        "scenario_design": "Predeclared fixed stop distances 1.0%, 1.5%, 2.0%, 2.5%, 3.0%, and 4.0%; take-profit held at 3.0%; identical chronological out-of-sample BUY/SELL/WAIT signals and cost assumptions.",
+        "same_predictions_and_cost_assumptions": True,
+        "scenario_selection_performed": False,
+        "warning": "These are comparisons on the same evaluation sample, not independent validation. Do not select a winning stop from this report alone; confirm on later unseen data and across disjoint periods.",
+        "scenarios": scenarios,
+        "real_money_trading_eligible": False,
+    }
+
 def summarize_probability_bands(predictions):
     """Summarize out-of-sample prediction quality by probability band after costs."""
     bands = [
@@ -731,6 +768,7 @@ def walk_forward_evaluate(candles):
         average_market_return, fixed_stake_pnl_usdt,
     )
     position_strategy = simulate_position_strategy(usable, predictions)
+    stop_loss_comparison = compare_stop_loss_scenarios(usable, predictions)
     holding_period_analysis = analyze_holding_periods(usable, predictions)
     regime_filter_comparison = compare_bullish_regime_filter(predictions)
     net_total_return = float(np.prod([1.0 + r for r in trade_returns]) - 1.0) if trade_returns else 0.0
@@ -801,6 +839,7 @@ def walk_forward_evaluate(candles):
         "probability_band_after_cost_analysis": summarize_probability_bands(predictions),
         "holding_period_cost_analysis": holding_period_analysis,
         "bullish_regime_filter_comparison": regime_filter_comparison,
+        "controlled_stop_loss_comparison": stop_loss_comparison,
         "sample_predictions": predictions[-10:],
     }
 
