@@ -20,6 +20,68 @@ PASSPHRASE = os.getenv("BITGET_PASSPHRASE", "")
 
 SYMBOL = os.getenv("BITGET_SYMBOL", "BTCUSDT")
 INTERVAL = os.getenv("BITGET_INTERVAL", "5m")
+CANDLE_CLOSE_GRACE_SECONDS = 2.0
+
+INTERVAL_MILLISECONDS = {
+    "1m": 60_000, "3m": 180_000, "5m": 300_000,
+    "15m": 900_000, "30m": 1_800_000,
+    "1H": 3_600_000, "4H": 14_400_000,
+    "6H": 21_600_000, "12H": 43_200_000, "1D": 86_400_000,
+}
+
+
+def interval_milliseconds(interval=INTERVAL):
+    """Return the official candle duration in milliseconds."""
+    try:
+        return INTERVAL_MILLISECONDS[interval]
+    except KeyError as error:
+        raise ValueError(f"Unsupported candle interval: {interval}") from error
+
+
+def wait_for_candle_close_grace(interval=INTERVAL, now_fn=None, sleep_fn=None):
+    """If execution is near a candle boundary, wait until 2 seconds after it.
+
+    GitHub Actions scheduling is best-effort, so this is a small boundary guard,
+    not a guarantee that a scheduled workflow runs at an exact second.
+    """
+    now_fn = now_fn or time.time
+    sleep_fn = sleep_fn or time.sleep
+    interval_seconds = interval_milliseconds(interval) / 1000.0
+    now = float(now_fn())
+    remainder = now % interval_seconds
+    until_next_close = interval_seconds - remainder
+
+    if remainder <= CANDLE_CLOSE_GRACE_SECONDS:
+        sleep_for = CANDLE_CLOSE_GRACE_SECONDS - remainder
+    elif until_next_close <= CANDLE_CLOSE_GRACE_SECONDS + 3.0:
+        sleep_for = until_next_close + CANDLE_CLOSE_GRACE_SECONDS
+    else:
+        sleep_for = 0.0
+
+    if sleep_for > 0:
+        sleep_fn(sleep_for)
+
+
+def filter_closed_candles(candles, interval=INTERVAL, now_ms=None, grace_ms=2000):
+    """Sort and return only candles closed at least grace_ms ago.
+
+    Bitget candle timestamps are candle-open timestamps in milliseconds.
+    Malformed rows are ignored; callers must not treat missing data as a signal.
+    """
+    now_ms = int(time.time() * 1000) if now_ms is None else int(now_ms)
+    duration_ms = interval_milliseconds(interval)
+    closed = []
+    for candle in candles or []:
+        if not isinstance(candle, (list, tuple)) or len(candle) < 5:
+            continue
+        try:
+            timestamp = int(candle[0])
+        except (TypeError, ValueError):
+            continue
+        if timestamp + duration_ms <= now_ms - int(grace_ms):
+            closed.append(candle)
+    return sorted(closed, key=lambda candle: int(candle[0]))
+
 
 # Keep this TRUE while testing.
 DEMO_TRADING = True
@@ -276,27 +338,36 @@ def calculate_rsi(values, period=14):
 
 
 def get_signal():
+    # If this process wakes very close to a candle boundary, allow Bitget a
+    # short grace period before requesting data. Away from a boundary we use
+    # the most recent candle already confirmed closed.
+    wait_for_candle_close_grace(INTERVAL)
     candles = get_candles()
 
-    # Bitget candle format: [timestamp, open, high, low, close, volume, turnover]
-    if not isinstance(candles, list) or len(candles) < 22:
-        return "WAIT", None, {"reason": "Not enough candle data"}
+    if not isinstance(candles, list):
+        return "WAIT", None, {"reason": "Invalid candle response"}
+
+    # Bitget candle format: [timestamp, open, high, low, close, volume, turnover].
+    # Exclude the forming candle even if the endpoint includes it.
+    ordered = filter_closed_candles(
+        candles,
+        interval=INTERVAL,
+        now_ms=int(time.time() * 1000),
+        grace_ms=int(CANDLE_CLOSE_GRACE_SECONDS * 1000),
+    )
+    if len(ordered) < 22:
+        return "WAIT", None, {
+            "reason": "Not enough confirmed closed candles",
+            "closed_candle_count": len(ordered),
+        }
 
     try:
-        closes = [float(candle[4]) for candle in candles if len(candle) > 4]
-    except (TypeError, ValueError, IndexError):
-        return "WAIT", None, {"reason": "Invalid candle data"}
-
-    if len(closes) < 22:
-        return "WAIT", None, {"reason": "Not enough valid closing prices"}
-
-    # Bitget candle endpoints commonly return newest first; sort by timestamp
-    # when timestamps are available so indicators use chronological closes.
-    try:
-        ordered = sorted(candles, key=lambda candle: int(candle[0]))
         closes = [float(candle[4]) for candle in ordered]
     except (TypeError, ValueError, IndexError):
-        pass
+        return "WAIT", None, {"reason": "Invalid closed-candle data"}
+
+    if len(closes) < 22:
+        return "WAIT", None, {"reason": "Not enough valid closed-candle prices"}
 
     fast_sma = calculate_sma(closes, 9)
     slow_sma = calculate_sma(closes, 21)
@@ -322,7 +393,9 @@ def get_signal():
         "slow_sma": slow_sma,
         "rsi_14": rsi,
         "indicator_score": score,
-        "reason": "Signal only; no orders are sent by this version",
+        "last_closed_candle_timestamp": int(ordered[-1][0]),
+        "closed_candle_count": len(ordered),
+        "reason": "Signal uses confirmed closed candles only; no orders are sent by this version",
     }
     return signal, current_price, details
 
@@ -594,7 +667,12 @@ def main(run_once=False):
             print("SAFE MODE: no order was placed.")
             if run_once:
                 return
-            time.sleep(60)
+            # In continuous mode, align the next poll with the next candle close
+            # plus the configured grace period instead of waking every minute.
+            interval_seconds = interval_milliseconds(INTERVAL) / 1000.0
+            now_seconds = time.time()
+            seconds_to_close = interval_seconds - (now_seconds % interval_seconds)
+            time.sleep(seconds_to_close + CANDLE_CLOSE_GRACE_SECONDS)
 
         except Exception as error:
             print("ERROR:", error)
