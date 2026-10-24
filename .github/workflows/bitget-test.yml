@@ -431,9 +431,13 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        interval: [5m, 1H, 4H]
     env:
       BITGET_SYMBOL: BTCUSDT
-      BITGET_INTERVAL: 5m
+      BITGET_INTERVAL: ${{ matrix.interval }}
       CANDLE_LOOKBACK_DAYS: "60"
       BACKTEST_STAKE_USDT: "10"
       BACKTEST_FEE_RATE: "0.001"
@@ -465,7 +469,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: historical-research-run-${{ github.run_number }}
+          name: historical-research-${{ matrix.interval }}-run-${{ github.run_number }}
           path: |
             feature_ablation_report.json
             model_selection_report.json
