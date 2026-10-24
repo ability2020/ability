@@ -463,3 +463,53 @@ class WalkForwardBacktestTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+    def test_minimum_favorable_move_filters_only_sell_signal_exit(self):
+        import pandas as pd
+
+        usable = pd.DataFrame([
+            {"timestamp": 1, "open": 100.0, "high": 100.5, "low": 99.5, "close": 100.0},
+            {"timestamp": 2, "open": 100.0, "high": 100.4, "low": 99.2, "close": 99.5},
+            {"timestamp": 3, "open": 99.5, "high": 100.6, "low": 99.3, "close": 100.2},
+        ])
+        predictions = [
+            {"timestamp": 1, "signal": "BUY"},
+            {"timestamp": 2, "signal": "SELL"},
+            {"timestamp": 3, "signal": "SELL"},
+        ]
+        result = walk_forward_backtest.simulate_position_strategy(
+            usable, predictions, stop_loss_percent=2.0, take_profit_percent=3.0,
+            minimum_favorable_move_before_sell_percent=0.5,
+        )
+        self.assertEqual(result["position_strategy_trade_count"], 1)
+        trade = result["position_strategy_trades_sample"][0]
+        self.assertEqual(trade["exit_reason"], "SELL_SIGNAL")
+        self.assertEqual(trade["exit_timestamp"], 3)
+        self.assertEqual(result["position_strategy_minimum_favorable_move_before_sell_percent"], 0.5)
+        self.assertFalse(result["real_money_trading_eligible"])
+
+    def test_controlled_exit_policy_comparison_is_research_only_and_one_factor_at_a_time(self):
+        import pandas as pd
+
+        usable = pd.DataFrame([
+            {"timestamp": 1, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+            {"timestamp": 2, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.5},
+            {"timestamp": 3, "open": 100.5, "high": 104.0, "low": 100.0, "close": 103.0},
+            {"timestamp": 4, "open": 103.0, "high": 103.5, "low": 102.0, "close": 102.5},
+        ])
+        predictions = [
+            {"timestamp": 1, "signal": "BUY"},
+            {"timestamp": 2, "signal": "WAIT"},
+            {"timestamp": 3, "signal": "WAIT"},
+            {"timestamp": 4, "signal": "SELL"},
+        ]
+        report = walk_forward_backtest.compare_controlled_exit_policies(usable, predictions)
+        self.assertEqual(report["report_type"], "experimental-controlled-exit-policy-comparison")
+        self.assertEqual(report["baseline_scenario"]["scenario"], "baseline_SL2_TP3_sell0")
+        self.assertEqual(len(report["scenarios"]), 8)
+        self.assertFalse(report["real_money_trading_eligible"])
+        self.assertFalse(report["orders_submitted"])
+        for scenario in report["scenarios"]:
+            self.assertFalse(scenario["real_money_trading_eligible"])
+        self.assertIn("same historical sample", report["comparison_warning"])
