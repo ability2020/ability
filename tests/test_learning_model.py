@@ -84,6 +84,33 @@ class LearningModelTests(unittest.TestCase):
         self.assertEqual(timestamps, sorted(set(timestamps)))
         self.assertGreaterEqual(len(candles), 273)
 
+    def test_fetch_candles_supports_an_offset_historical_window(self):
+        fixed_now = 1_800_000_000
+        interval_ms = 300_000
+
+        def fake_get(url, **kwargs):
+            params = kwargs["params"]
+            start_ms = int(params["startTime"])
+            end_ms = int(params["endTime"])
+            rows = [
+                [str(timestamp), "100", "101", "99", "100.5", "10", "0"]
+                for timestamp in range(start_ms, end_ms + 1, interval_ms)
+            ]
+            mocked = Mock()
+            mocked.raise_for_status.return_value = None
+            mocked.json.return_value = {"code": "00000", "data": list(reversed(rows[-100:]))}
+            return mocked
+
+        with patch.object(learning_model.time, "time", return_value=fixed_now, create=True), \\
+             patch.object(learning_model.requests, "get", side_effect=fake_get):
+            candles = learning_model.fetch_candles(lookback_days=1, end_offset_days=60)
+
+        timestamps = [int(candle[0]) for candle in candles]
+        expected_end = ((fixed_now * 1000) // interval_ms) * interval_ms - 60 * 24 * 60 * 60 * 1000
+        self.assertGreaterEqual(len(timestamps), 273)
+        self.assertLessEqual(max(timestamps), expected_end)
+        self.assertGreaterEqual(max(timestamps), expected_end - interval_ms)
+
     def test_fetch_candles_rejects_lookback_outside_regular_endpoint_window(self):
         with self.assertRaises(ValueError):
             learning_model.fetch_candles(lookback_days=90)
