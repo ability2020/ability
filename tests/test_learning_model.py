@@ -1,4 +1,5 @@
 import unittest
+import time
 from unittest.mock import Mock, patch
 
 import numpy as np
@@ -101,7 +102,7 @@ class LearningModelTests(unittest.TestCase):
             mocked.json.return_value = {"code": "00000", "data": list(reversed(rows[-100:]))}
             return mocked
 
-        with patch.object(learning_model.time, "time", return_value=fixed_now, create=True), \\
+        with patch.object(time, "time", return_value=fixed_now), \\
              patch.object(learning_model.requests, "get", side_effect=fake_get):
             candles = learning_model.fetch_candles(lookback_days=1, end_offset_days=60)
 
