@@ -513,3 +513,61 @@ if __name__ == "__main__":
         for scenario in report["scenarios"]:
             self.assertFalse(scenario["real_money_trading_eligible"])
         self.assertIn("same historical sample", report["comparison_warning"])
+
+    def test_historical_window_validation_checks_requested_offset_and_boundaries(self):
+        interval_ms = 300_000
+        now_ms = 1_800_000_000_000
+        aligned_now = (now_ms // interval_ms) * interval_ms
+        end_ms = aligned_now - 10 * 86_400_000
+        start_ms = end_ms - 3 * 86_400_000
+        candles = [
+            [str(start_ms), "1", "1", "1", "1", "1", "0"],
+            [str(end_ms), "1", "1", "1", "1", "1", "0"],
+        ]
+        report = walk_forward_backtest.build_candle_window_validation(
+            candles, lookback_days=3, end_offset_days=10,
+            now_ms=now_ms, interval_name="5m",
+        )
+        self.assertEqual(report["requested_end_offset_days"], 10)
+        self.assertTrue(report["start_boundary_valid"])
+        self.assertTrue(report["end_boundary_valid"])
+        self.assertTrue(report["offset_validation_passed"])
+
+        wrong_window = [
+            [str(start_ms + 20 * 86_400_000), "1", "1", "1", "1", "1", "0"],
+            [str(end_ms + 20 * 86_400_000), "1", "1", "1", "1", "1", "0"],
+        ]
+        invalid = walk_forward_backtest.build_candle_window_validation(
+            wrong_window, lookback_days=3, end_offset_days=10,
+            now_ms=now_ms, interval_name="5m",
+        )
+        self.assertFalse(invalid["offset_validation_passed"])
+
+    def test_historical_window_validation_checks_requested_offset_and_boundaries(self):
+        interval_ms = 300_000
+        now_ms = 1_800_000_000_000
+        aligned_now = (now_ms // interval_ms) * interval_ms
+        end_ms = aligned_now - 10 * 86_400_000
+        start_ms = end_ms - 3 * 86_400_000
+        candles = [
+            [str(start_ms), "1", "1", "1", "1", "1", "0"],
+            [str(end_ms), "1", "1", "1", "1", "1", "0"],
+        ]
+        report = walk_forward_backtest.build_candle_window_validation(
+            candles, lookback_days=3, end_offset_days=10,
+            now_ms=now_ms, interval_name="5m",
+        )
+        self.assertEqual(report["requested_end_offset_days"], 10)
+        self.assertTrue(report["start_boundary_valid"])
+        self.assertTrue(report["end_boundary_valid"])
+        self.assertTrue(report["offset_validation_passed"])
+
+        wrong_window = [
+            [str(start_ms + 20 * 86_400_000), "1", "1", "1", "1", "1", "0"],
+            [str(end_ms + 20 * 86_400_000), "1", "1", "1", "1", "1", "0"],
+        ]
+        invalid = walk_forward_backtest.build_candle_window_validation(
+            wrong_window, lookback_days=3, end_offset_days=10,
+            now_ms=now_ms, interval_name="5m",
+        )
+        self.assertFalse(invalid["offset_validation_passed"])
