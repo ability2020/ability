@@ -1108,6 +1108,46 @@ def compare_controlled_exit_policies(usable, predictions):
 
 
 
+def build_candle_window_validation(candles, lookback_days, end_offset_days, now_ms=None, interval_name=INTERVAL):
+    """Report whether fetched candles match the explicitly requested historical window."""
+    interval_ms_by_name = {
+        "1m": 60_000, "3m": 180_000, "5m": 300_000,
+        "15m": 900_000, "30m": 1_800_000,
+        "1H": 3_600_000, "4H": 14_400_000,
+        "6H": 21_600_000, "12H": 43_200_000, "1D": 86_400_000,
+    }
+    if interval_name not in interval_ms_by_name:
+        raise ValueError(f"Unsupported interval for window validation: {interval_name}")
+    if not candles:
+        raise ValueError("Cannot validate an empty candle window.")
+    interval_ms = interval_ms_by_name[interval_name]
+    if now_ms is None:
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    expected_end_ms = (int(now_ms) // interval_ms) * interval_ms - int(end_offset_days) * 86_400_000
+    expected_start_ms = expected_end_ms - int(lookback_days) * 86_400_000
+    actual_timestamps = [int(row[0]) for row in candles]
+    actual_start_ms = min(actual_timestamps)
+    actual_end_ms = max(actual_timestamps)
+    tolerance_ms = 2 * interval_ms
+    start_in_window = actual_start_ms >= expected_start_ms - tolerance_ms
+    end_in_window = actual_end_ms <= expected_end_ms and expected_end_ms - actual_end_ms <= tolerance_ms
+    return {
+        "requested_lookback_days": int(lookback_days),
+        "requested_end_offset_days": int(end_offset_days),
+        "expected_window_start_utc": datetime.fromtimestamp(expected_start_ms / 1000, timezone.utc).isoformat(),
+        "expected_window_end_utc": datetime.fromtimestamp(expected_end_ms / 1000, timezone.utc).isoformat(),
+        "actual_first_candle_utc": datetime.fromtimestamp(actual_start_ms / 1000, timezone.utc).isoformat(),
+        "actual_last_candle_utc": datetime.fromtimestamp(actual_end_ms / 1000, timezone.utc).isoformat(),
+        "actual_coverage_days": round((actual_end_ms - actual_start_ms) / 86_400_000, 3),
+        "actual_candle_count": len(candles),
+        "start_boundary_valid": bool(start_in_window),
+        "end_boundary_valid": bool(end_in_window),
+        "offset_validation_passed": bool(start_in_window and end_in_window),
+        "validation_tolerance_candles": 2,
+        "note": "The actual first/last candle timestamps are checked against the requested lookback and end offset. A failed validation means the report must not be treated as an independent historical window.",
+    }
+
+
 def main():
     candles = fetch_candles()
     result = walk_forward_evaluate(candles)
@@ -1134,6 +1174,7 @@ def main():
         "threshold_refresh_every_predictions": THRESHOLD_REFRESH_PREDICTIONS,
         "note": "Predictions are sampled chronologically every N candles; each prediction still scores the immediately following candle. Threshold tuning is refreshed periodically using only the training prefix available at that point.",
     }
+    requested_end_offset_days = int(os.getenv("CANDLE_END_OFFSET_DAYS", "0"))
     result["candle_history_coverage"] = {
         "requested_lookback_days": requested_lookback_days,
         "actual_coverage_days": round((last_timestamp - first_timestamp) / 86_400_000, 3),
@@ -1143,6 +1184,9 @@ def main():
         "last_candle_utc": datetime.fromtimestamp(last_timestamp / 1000, timezone.utc).isoformat(),
         "coverage_validation": "fetch_candles validates each 30-day window and requires at least 95% of expected candle count.",
     }
+    result["historical_window_validation"] = build_candle_window_validation(
+        candles, requested_lookback_days, requested_end_offset_days, interval_name=INTERVAL
+    )
     multi_period_result = evaluate_multiple_unseen_periods(candles, period_count=4)
     created_at = datetime.now(timezone.utc).isoformat()
     result["multi_period_evaluation"] = multi_period_result
@@ -1153,6 +1197,9 @@ def main():
     with open("multi_period_report.json", "w", encoding="utf-8") as handle:
         json.dump(multi_period_result, handle, indent=2, allow_nan=False)
     print("WALK-FORWARD EVALUATION — public data only; no orders.")
+    print("Historical window offset (days):", result["historical_window_validation"]["requested_end_offset_days"])
+    print("Historical window validation passed:", result["historical_window_validation"]["offset_validation_passed"])
+    print("Actual candle window:", result["historical_window_validation"]["actual_first_candle_utc"], "to", result["historical_window_validation"]["actual_last_candle_utc"])
     print("Predictions:", result["walk_forward_prediction_count"])
     print("Directional accuracy:", round(result["directional_accuracy"], 4))
     print("Balanced accuracy:", round(result["directional_balanced_accuracy"], 4))
