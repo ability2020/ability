@@ -32,8 +32,8 @@ FEATURE_COLUMNS = [
 ]
 
 
-def fetch_candles(lookback_days=None):
-    """Fetch and validate recent Spot candles in overlapping-safe 30-day windows.
+def fetch_candles(lookback_days=None, end_offset_days=None):
+    """Fetch and validate Spot candles in overlapping-safe 30-day windows.
 
     Bitget's v3 historical candles endpoint returns at most 100 rows per request.
     Each 30-day window is paginated backwards using its oldest returned timestamp,
@@ -47,6 +47,10 @@ def fetch_candles(lookback_days=None):
         lookback_days = int(os.getenv("CANDLE_LOOKBACK_DAYS", "60"))
     if not isinstance(lookback_days, int) or not 1 <= lookback_days <= 89:
         raise ValueError("CANDLE_LOOKBACK_DAYS must be an integer from 1 to 89.")
+    if end_offset_days is None:
+        end_offset_days = int(os.getenv("CANDLE_END_OFFSET_DAYS", "0"))
+    if not isinstance(end_offset_days, int) or not 0 <= end_offset_days <= 365:
+        raise ValueError("CANDLE_END_OFFSET_DAYS must be an integer from 0 to 365.")
 
     interval_ms_by_name = {
         "1m": 60_000, "3m": 180_000, "5m": 300_000,
@@ -60,7 +64,8 @@ def fetch_candles(lookback_days=None):
     interval_ms = interval_ms_by_name[INTERVAL]
     page_limit = 100
     now_ms = int(time.time() * 1000)
-    end_ms = (now_ms // interval_ms) * interval_ms
+    latest_aligned_ms = (now_ms // interval_ms) * interval_ms
+    end_ms = latest_aligned_ms - end_offset_days * 24 * 60 * 60 * 1000
     start_ms = end_ms - lookback_days * 24 * 60 * 60 * 1000
     window_ms = 30 * 24 * 60 * 60 * 1000
     candles_by_timestamp = {}
