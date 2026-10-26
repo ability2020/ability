@@ -414,6 +414,31 @@ class WalkForwardBacktestTests(unittest.TestCase):
             )
 
 
+    def test_bullish_regime_position_comparison_uses_identical_exit_rules_and_costs(self):
+        import pandas as pd
+
+        usable = pd.DataFrame([
+            {"timestamp": i, "open": p, "high": p + 0.4, "low": p - 0.4, "close": p}
+            for i, p in enumerate([100.0, 100.5, 101.0, 100.8, 101.2], start=1)
+        ])
+        predictions = [
+            {"timestamp": 1, "signal": "BUY", "sma_gap_20": 0.01},
+            {"timestamp": 2, "signal": "BUY", "sma_gap_20": -0.01},
+            {"timestamp": 3, "signal": "SELL", "sma_gap_20": 0.01},
+            {"timestamp": 4, "signal": "BUY", "sma_gap_20": 0.02},
+        ]
+        report = walk_forward_backtest.compare_bullish_regime_position_strategies(
+            usable, predictions
+        )
+        self.assertTrue(report["same_out_of_sample_predictions_and_exit_rules"])
+        self.assertEqual(report["buy_signals_blocked_by_filter"], 1)
+        self.assertEqual(report["stop_loss_percent"], 2.0)
+        self.assertEqual(report["take_profit_percent"], 3.0)
+        self.assertEqual(report["fee_rate_each_side"], walk_forward_backtest.FEE_RATE)
+        self.assertEqual(report["slippage_rate_each_side"], walk_forward_backtest.SLIPPAGE_RATE)
+        self.assertFalse(report["orders_submitted"])
+        self.assertFalse(report["real_money_trading_eligible"])
+
     def test_bullish_regime_filter_comparison_uses_same_out_of_sample_buy_signals(self):
         predictions = [
             {"signal": "BUY", "net_return_fraction": 0.02, "sma_gap_20": 0.01},
