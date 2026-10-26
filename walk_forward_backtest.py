@@ -661,6 +661,61 @@ def compare_bullish_regime_filter(predictions, stake_usdt=STAKE_USDT):
     }
 
 
+def compare_bullish_regime_position_strategies(usable, predictions):
+    """Compare baseline and bullish-filtered entries with identical OHLC exit rules and costs."""
+    baseline = simulate_position_strategy(usable, predictions)
+    filtered_predictions = []
+    blocked_buy_count = 0
+    for prediction in predictions:
+        item = dict(prediction)
+        if item.get("signal") == "BUY":
+            gap = item.get("sma_gap_20")
+            if gap is None or float(gap) <= 0.0:
+                item["signal"] = "WAIT"
+                blocked_buy_count += 1
+        filtered_predictions.append(item)
+    filtered = simulate_position_strategy(usable, filtered_predictions)
+
+    def summary(report):
+        return {
+            "trade_count": report["position_strategy_trade_count"],
+            "net_pnl_usdt_after_estimated_costs": report["position_strategy_closed_trade_pnl_usdt"],
+            "gross_price_pnl_usdt": report["position_strategy_gross_price_pnl_usdt"],
+            "estimated_total_costs_usdt": report["position_strategy_estimated_total_costs_usdt"],
+            "maximum_drawdown_usdt": report["position_strategy_maximum_drawdown_usdt"],
+            "stop_loss_trade_count": report["position_strategy_stop_loss_diagnostics"]["stop_loss_trade_count"],
+            "take_profit_touch_candle_count": report["position_strategy_target_level_touch_candle_count"],
+        }
+
+    baseline_summary = summary(baseline)
+    filtered_summary = summary(filtered)
+    minimum_trades_for_interpretation = 10
+    return {
+        "report_type": "experimental-bullish-regime-position-strategy-comparison",
+        "filter_definition": "Block BUY entries unless current-candle sma_gap_20 > 0; preserve SELL signals and apply identical stop-loss/take-profit rules.",
+        "same_out_of_sample_predictions_and_exit_rules": True,
+        "stop_loss_percent": baseline["position_strategy_stop_loss_percent"],
+        "take_profit_percent": baseline["position_strategy_take_profit_percent"],
+        "fee_rate_each_side": FEE_RATE,
+        "slippage_rate_each_side": SLIPPAGE_RATE,
+        "baseline_unfiltered": baseline_summary,
+        "bullish_regime_filtered": filtered_summary,
+        "buy_signals_blocked_by_filter": blocked_buy_count,
+        "net_pnl_difference_filtered_minus_baseline_usdt": (
+            filtered_summary["net_pnl_usdt_after_estimated_costs"]
+            - baseline_summary["net_pnl_usdt_after_estimated_costs"]
+        ),
+        "minimum_trades_for_interpretation": minimum_trades_for_interpretation,
+        "both_scenarios_have_at_least_minimum_trades": (
+            baseline_summary["trade_count"] >= minimum_trades_for_interpretation
+            and filtered_summary["trade_count"] >= minimum_trades_for_interpretation
+        ),
+        "interpretation_warning": "If either scenario has fewer than 10 closed trades, treat the comparison as inconclusive. This single period cannot authorize deployment.",
+        "orders_submitted": False,
+        "real_money_trading_eligible": False,
+    }
+
+
 def walk_forward_evaluate(candles):
     _validate_settings()
     frame = build_feature_frame(candles)
@@ -779,6 +834,7 @@ def walk_forward_evaluate(candles):
     controlled_exit_policy_comparison = compare_controlled_exit_policies(usable, predictions)
     holding_period_analysis = analyze_holding_periods(usable, predictions)
     regime_filter_comparison = compare_bullish_regime_filter(predictions)
+    regime_position_comparison = compare_bullish_regime_position_strategies(usable, predictions)
     net_total_return = float(np.prod([1.0 + r for r in trade_returns]) - 1.0) if trade_returns else 0.0
     baseline_total_return = float(np.prod([1.0 + r for r in baseline_returns]) - 1.0)
     return {
@@ -847,6 +903,7 @@ def walk_forward_evaluate(candles):
         "probability_band_after_cost_analysis": summarize_probability_bands(predictions),
         "holding_period_cost_analysis": holding_period_analysis,
         "bullish_regime_filter_comparison": regime_filter_comparison,
+        "bullish_regime_position_strategy_comparison": regime_position_comparison,
         "controlled_stop_loss_comparison": stop_loss_comparison,
         "controlled_exit_policy_comparison": controlled_exit_policy_comparison,
         "sample_predictions": predictions[-10:],
