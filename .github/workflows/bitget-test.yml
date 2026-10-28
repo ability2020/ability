@@ -469,6 +469,9 @@ jobs:
       - name: Walk-forward backtest with estimated fees and slippage (no orders)
         run: python walk_forward_backtest.py
 
+      - name: Validate bullish-regime filter across three independent windows (no orders)
+        run: python multi_window_validation.py
+
       - name: Upload historical research reports
         if: always()
         uses: actions/upload-artifact@v6
@@ -478,6 +481,7 @@ jobs:
             feature_ablation_report.json
             model_selection_report.json
             walk_forward_report.json
+            multi_window_validation_report.json
           if-no-files-found: warn
           retention-days: 30
 
