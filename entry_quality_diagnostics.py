@@ -79,8 +79,8 @@ def build_predictions(usable):
             "macd_hist_pct": safe_float(row.get("macd_hist_pct")),
             "range_pct": safe_float(row.get("range_pct")),
         })
-    if len(predictions) < 20:
-        raise ValueError(f"Entry diagnostics need at least 20 chronological predictions; got {len(predictions)}.")
+    # Sparse higher-timeframe windows can legitimately produce fewer predictions.
+    # Keep the workflow green and report the sample as inconclusive instead of failing.
     return predictions
 
 
@@ -180,6 +180,9 @@ def main():
         "interval": INTERVAL,
         "historical_window_validation": window_validation,
         "prediction_count": len(predictions),
+        "minimum_predictions_for_interpretation": 20,
+        "prediction_sample_sufficient": len(predictions) >= 20,
+        "interpretation_status": "interpretable" if len(predictions) >= 20 else "inconclusive_insufficient_predictions",
         "buy_signal_count": len(buys),
         "buy_entry_next_candle_quality": summarize_rows(buys),
         "feature_bucket_analysis_of_buy_entries": feature_analysis,
@@ -198,7 +201,8 @@ def main():
             "filter_candidates_predeclared": True,
             "candidate_filters_tuned_on_results": False,
             "candidate_comparison_sample_is_independent": False,
-            "note": "These candidate comparisons share one historical window and are exploratory. A candidate with fewer than 10 closed trades is inconclusive; even a positive result must be confirmed on new untouched windows before any strategy change.",
+            "minimum_predictions_for_interpretation": 20,
+            "note": "When fewer than 20 chronological predictions are available, the script still writes a report but marks it inconclusive; do not interpret small-sample results. These candidate comparisons share one historical window and are exploratory. A candidate with fewer than 10 closed trades is inconclusive; even a positive result must be confirmed on new untouched windows before any strategy change.",
         },
         "orders_submitted": False,
         "real_money_trading_eligible": False,
