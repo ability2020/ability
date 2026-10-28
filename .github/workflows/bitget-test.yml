@@ -475,6 +475,9 @@ jobs:
       - name: Diagnose entry quality and predeclared candidate filters (no orders)
         run: python entry_quality_diagnostics.py
 
+      - name: Validate entry filters across three independent windows (no orders)
+        run: python multi_window_entry_filter_validation.py
+
       - name: Upload historical research reports
         if: always()
         uses: actions/upload-artifact@v6
@@ -486,6 +489,7 @@ jobs:
             walk_forward_report.json
             multi_window_validation_report.json
             entry_quality_report.json
+            multi_window_entry_filter_report.json
           if-no-files-found: warn
           retention-days: 30
 
