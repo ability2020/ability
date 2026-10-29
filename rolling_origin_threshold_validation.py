@@ -44,10 +44,13 @@ def threshold_summary(predictions, threshold):
     }
 
 
-def load_window(offset_days, started_ms):
+def load_window(offset_days):
     candles = fetch_candles(lookback_days=LOOKBACK_DAYS, end_offset_days=offset_days)
+    # Anchor validation to the fetch itself, not the start of a long multi-window run.
+    # Otherwise later windows can appear one candle newer than the stale run-start clock.
+    validation_now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     validation = build_candle_window_validation(
-        candles, LOOKBACK_DAYS, offset_days, now_ms=started_ms, interval_name=INTERVAL
+        candles, LOOKBACK_DAYS, offset_days, now_ms=validation_now_ms, interval_name=INTERVAL
     )
     if not validation["offset_validation_passed"]:
         raise RuntimeError(
@@ -58,13 +61,12 @@ def load_window(offset_days, started_ms):
 
 
 def main():
-    started_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     periods = []
 
     for test_offset in TEST_END_OFFSETS_DAYS:
         calibration_offset = test_offset + LOOKBACK_DAYS
-        cal_validation, cal_candles, cal_predictions = load_window(calibration_offset, started_ms)
-        test_validation, test_candles, test_predictions = load_window(test_offset, started_ms)
+        cal_validation, cal_candles, cal_predictions = load_window(calibration_offset)
+        test_validation, test_candles, test_predictions = load_window(test_offset)
 
         candidates = [threshold_summary(cal_predictions, threshold) for threshold in THRESHOLDS]
         eligible = [row for row in candidates if row["minimum_entries_met"]]
