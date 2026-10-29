@@ -481,6 +481,9 @@ jobs:
       - name: Measure probability calibration and select threshold on an earlier window; test untouched window (no orders)
         run: python probability_calibration_diagnostics.py
 
+      - name: Repeat threshold selection across rolling origins; evaluate untouched windows (no orders)
+        run: python rolling_origin_threshold_validation.py
+
       - name: Upload historical research reports
         if: always()
         uses: actions/upload-artifact@v6
@@ -494,6 +497,7 @@ jobs:
             entry_quality_report.json
             multi_window_entry_filter_report.json
             probability_calibration_report.json
+            rolling_origin_threshold_report.json
           if-no-files-found: warn
           retention-days: 30
 
