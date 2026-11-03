@@ -83,7 +83,13 @@ class LearningModelTests(unittest.TestCase):
 
         timestamps = [int(candle[0]) for candle in candles]
         self.assertEqual(timestamps, sorted(set(timestamps)))
-        self.assertGreaterEqual(len(candles), 273)
+        self.assertGreaterEqual(len(candles), 287)
+        # Every adjacent 5-minute candle must be present, including page
+        # boundaries; this catches the one-candle pagination skip.
+        self.assertTrue(all(
+            right - left == 300_000
+            for left, right in zip(timestamps, timestamps[1:])
+        ))
         diagnostics = learning_model.fetch_candles.last_diagnostics
         self.assertGreater(diagnostics["request_count"], 1)
         self.assertEqual(diagnostics["total_rows"], len(candles))
@@ -92,6 +98,8 @@ class LearningModelTests(unittest.TestCase):
                             for page in diagnostics["requests"]))
         self.assertEqual(diagnostics["oldest_timestamp"], timestamps[0])
         self.assertEqual(diagnostics["newest_timestamp"], timestamps[-1])
+        self.assertEqual(diagnostics["gap_count"], 0)
+        self.assertEqual(diagnostics["missing_interval_count"], 0)
 
     def test_fetch_candles_supports_an_offset_historical_window(self):
         fixed_now = 1_800_000_000
