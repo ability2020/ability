@@ -22,7 +22,7 @@ jobs:
       BITGET_SYMBOL: BTCUSDT
       BITGET_INTERVAL: 5m
       TRADE_AMOUNT_USDT: "10"
-      CANDLE_LOOKBACK_DAYS: "3"
+      CANDLE_LOOKBACK_DAYS: "60"
 
     steps:
       - name: Checkout repository
