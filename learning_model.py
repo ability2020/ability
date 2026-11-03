@@ -162,7 +162,12 @@ def fetch_candles(lookback_days=None, end_offset_days=None):
             oldest_timestamp = min(valid_timestamps)
             if oldest_timestamp <= window_start:
                 break
-            next_cursor = oldest_timestamp - 1
+            # Keep the oldest candle timestamp inclusive on the next page.
+            # Bitget's history endpoint can otherwise round an endTime of
+            # oldest_timestamp - 1 down by a full interval, skipping one candle.
+            # The shared boundary row is harmless because results are
+            # deduplicated by timestamp.
+            next_cursor = oldest_timestamp
             if next_cursor >= cursor_end_ms:
                 raise RuntimeError("Bitget candle pagination made no backward progress.")
             cursor_end_ms = next_cursor
@@ -188,6 +193,27 @@ def fetch_candles(lookback_days=None, end_offset_days=None):
         window_start = window_end
 
     candles = [candles_by_timestamp[key] for key in sorted(candles_by_timestamp)]
+    timestamps = [int(candle[0]) for candle in candles]
+    gaps = [
+        {
+            "previous_timestamp": timestamps[index - 1],
+            "next_timestamp": timestamps[index],
+            "missing_intervals": max(0, (timestamps[index] - timestamps[index - 1]) // interval_ms - 1),
+        }
+        for index in range(1, len(timestamps))
+        if timestamps[index] - timestamps[index - 1] != interval_ms
+    ]
+    fetch_diagnostics["gap_count"] = len(gaps)
+    fetch_diagnostics["missing_interval_count"] = sum(
+        gap["missing_intervals"] for gap in gaps
+    )
+    fetch_diagnostics["gap_examples"] = gaps[:10]
+    if gaps:
+        raise RuntimeError(
+            f"Historical candle data contains {len(gaps)} timestamp gaps "
+            f"({fetch_diagnostics['missing_interval_count']} missing intervals); "
+            f"first gap: {gaps[0]}."
+        )
     expected_count = max(1, int((end_ms - start_ms) // interval_ms))
     minimum_expected_count = int(expected_count * 0.95)
     if len(candles) < minimum_expected_count:
