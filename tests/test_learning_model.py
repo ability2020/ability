@@ -84,6 +84,14 @@ class LearningModelTests(unittest.TestCase):
         timestamps = [int(candle[0]) for candle in candles]
         self.assertEqual(timestamps, sorted(set(timestamps)))
         self.assertGreaterEqual(len(candles), 273)
+        diagnostics = learning_model.fetch_candles.last_diagnostics
+        self.assertGreater(diagnostics["request_count"], 1)
+        self.assertEqual(diagnostics["total_rows"], len(candles))
+        self.assertEqual(diagnostics["requested_lookback_days"], 1)
+        self.assertTrue(all("rows_received" in page and "new_rows" in page
+                            for page in diagnostics["requests"]))
+        self.assertEqual(diagnostics["oldest_timestamp"], timestamps[0])
+        self.assertEqual(diagnostics["newest_timestamp"], timestamps[-1])
 
     def test_fetch_candles_supports_an_offset_historical_window(self):
         fixed_now = 1_800_000_000

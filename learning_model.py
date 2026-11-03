@@ -69,6 +69,13 @@ def fetch_candles(lookback_days=None, end_offset_days=None):
     start_ms = end_ms - lookback_days * 24 * 60 * 60 * 1000
     window_ms = 30 * 24 * 60 * 60 * 1000
     candles_by_timestamp = {}
+    fetch_diagnostics = {
+        "endpoint": "/api/v3/market/history-candles",
+        "requested_lookback_days": lookback_days,
+        "interval": INTERVAL,
+        "page_limit": page_limit,
+        "requests": [],
+    }
 
     # Query each bounded window separately. Keep the boundary candle in both
     # adjacent requests if the API rounds timestamps; timestamp deduplication
@@ -118,9 +125,17 @@ def fetch_candles(lookback_days=None, end_offset_days=None):
                 )
             page = payload.get("data", [])
             if not isinstance(page, list) or not page:
+                fetch_diagnostics["requests"].append({
+                    "rows_received": len(page) if isinstance(page, list) else 0,
+                    "new_rows": 0,
+                    "oldest_timestamp": None,
+                    "newest_timestamp": None,
+                    "cursor_end_ms": cursor_end_ms,
+                })
                 break
 
             valid_timestamps = []
+            new_rows = 0
             for candle in page:
                 if not isinstance(candle, (list, tuple)) or len(candle) < 6:
                     continue
@@ -129,10 +144,19 @@ def fetch_candles(lookback_days=None, end_offset_days=None):
                 except (TypeError, ValueError):
                     continue
                 if window_start <= timestamp <= window_end:
+                    if timestamp not in candles_by_timestamp:
+                        new_rows += 1
                     candles_by_timestamp[timestamp] = candle
                     window_timestamps.add(timestamp)
                     valid_timestamps.append(timestamp)
 
+            fetch_diagnostics["requests"].append({
+                "rows_received": len(page),
+                "new_rows": new_rows,
+                "oldest_timestamp": min(valid_timestamps) if valid_timestamps else None,
+                "newest_timestamp": max(valid_timestamps) if valid_timestamps else None,
+                "cursor_end_ms": cursor_end_ms,
+            })
             if not valid_timestamps:
                 break
             oldest_timestamp = min(valid_timestamps)
@@ -171,6 +195,11 @@ def fetch_candles(lookback_days=None, end_offset_days=None):
             f"Incomplete candle history: requested {lookback_days} days at {INTERVAL}, "
             f"expected at least {minimum_expected_count} candles but received {len(candles)}."
         )
+    fetch_diagnostics["total_rows"] = len(candles)
+    fetch_diagnostics["request_count"] = len(fetch_diagnostics["requests"])
+    fetch_diagnostics["oldest_timestamp"] = int(candles[0][0])
+    fetch_diagnostics["newest_timestamp"] = int(candles[-1][0])
+    fetch_candles.last_diagnostics = fetch_diagnostics
     print(
         f"Historical coverage verified: {len(candles)} candles, "
         f"{datetime.fromtimestamp(int(candles[0][0]) / 1000, timezone.utc).isoformat()} "
@@ -351,6 +380,7 @@ def train_and_evaluate(candles):
 def main():
     candles = fetch_candles()
     result = train_and_evaluate(candles)
+    result["candle_fetch"] = getattr(fetch_candles, "last_diagnostics", {})
     result["created_at_utc"] = datetime.now(timezone.utc).isoformat()
     with open("ml_report.json", "w", encoding="utf-8") as handle:
         json.dump(result, handle, indent=2, allow_nan=False)
