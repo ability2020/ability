@@ -66,7 +66,10 @@ def apply_entry_filter(frame, candidate):
 
 
 def evaluate_candidate(frame, candidate, start=0, end=None):
-    filtered, blocked = apply_entry_filter(frame, candidate)
+    filtered, _ = apply_entry_filter(frame, candidate)
+    end_index = len(frame) if end is None else min(int(end), len(frame))
+    start_index = max(0, int(start))
+    blocked = int(((frame["signal"] == "BUY") & (filtered["signal"] == "WAIT")).iloc[start_index:end_index].sum())
     trades = simulate(filtered, "immediate_sell", start=start, end=end)
     result = summarize(trades)
     result["buy_signals_blocked"] = blocked
