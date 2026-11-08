@@ -32,7 +32,9 @@ class IndicatorEntryFilterResearchTests(unittest.TestCase):
 
     def test_apply_filter_changes_only_blocked_buy_signals(self):
         filtered, blocked = apply_entry_filter(self.frame, "rsi_50_to_65")
-        self.assertEqual(blocked, 2)
+        # Only the third row is a BUY outside the RSI range. The final row
+        # has low RSI but is WAIT, so it must not count as a blocked BUY.
+        self.assertEqual(blocked, 1)
         self.assertEqual(filtered["signal"].tolist(), ["BUY", "BUY", "WAIT", "SELL", "WAIT"])
 
     def test_trend_confirmation_requires_both_conditions(self):
