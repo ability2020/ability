@@ -472,6 +472,9 @@ jobs:
       - name: Replay production SMA/RSI paper strategy with next-candle execution and costs (no orders)
         run: python indicator_strategy_backtest.py
 
+      - name: Compare predeclared production indicator BUY filters (no orders)
+        run: python indicator_entry_filter_research.py
+
       - name: Validate bullish-regime filter across three independent windows (no orders)
         run: python multi_window_validation.py
 
@@ -497,6 +500,7 @@ jobs:
             model_selection_report.json
             walk_forward_report.json
             indicator_strategy_report.json
+            indicator_entry_filter_report.json
             multi_window_validation_report.json
             entry_quality_report.json
             multi_window_entry_filter_report.json
