@@ -176,6 +176,7 @@ jobs:
           path: |
             bot_state.json
             paper_state.json
+            monitor_state.json
           key: bitget-bot-state-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
             bitget-bot-state-${{ github.ref_name }}-
@@ -231,6 +232,8 @@ jobs:
               "sma_9": safe_number(details.get("fast_sma")),
               "sma_21": safe_number(details.get("slow_sma")),
               "rsi_14": safe_number(details.get("rsi_14")),
+              "last_closed_candle_timestamp": details.get("last_closed_candle_timestamp"),
+              "closed_candle_count": details.get("closed_candle_count"),
               "signal_reason": details.get("reason"),
               "risk_decision": risk_decision,
               "risk_reason": risk_reason,
@@ -259,6 +262,10 @@ jobs:
           print("Closed simulated trades recorded:", len(updated["closed_trades"]))
           print("Actual market signal record created: paper_signal.json")
           PY
+
+      - name: Record monitoring cadence and candle freshness
+        if: always()
+        run: python monitoring.py
 
       - name: Create paper-trading performance report
         if: always()
@@ -342,7 +349,14 @@ jobs:
                   "cost_assumptions": "0.10% fee and 0.05% slippage per side; estimates only",
               }
 
+          try:
+              with open("monitoring_report.json", "r", encoding="utf-8") as file:
+                  monitoring_report = json.load(file)
+          except (OSError, json.JSONDecodeError):
+              monitoring_report = None
+
           report = {
+              "monitoring": monitoring_report,
               "report_type": "paper-trading-only-with-market-signal",
               "created_at_utc": datetime.now(timezone.utc).isoformat(),
               "github_run_id": os.getenv("GITHUB_RUN_ID"),
@@ -411,6 +425,7 @@ jobs:
           path: |
             bot_state.json
             paper_state.json
+            monitor_state.json
           key: bitget-bot-state-${{ github.ref_name }}-${{ github.run_id }}
 
       - name: Upload paper-trading report
@@ -421,6 +436,7 @@ jobs:
           path: |
             paper_report.json
             paper_signal.json
+            monitoring_report.json
             ml_report.json
             walk_forward_report.json
             multi_period_report.json
