@@ -7,7 +7,7 @@ from pathlib import Path
 STATE_PATH = Path(os.getenv("MONITOR_STATE_FILE", "monitor_state.json"))
 SIGNAL_PATH = Path(os.getenv("PAPER_SIGNAL_FILE", "paper_signal.json"))
 REPORT_PATH = Path(os.getenv("MONITOR_REPORT_FILE", "monitoring_report.json"))
-EXPECTED_INTERVAL_SECONDS = int(os.getenv("EXPECTED_MONITOR_INTERVAL_SECONDS", "900"))
+EXPECTED_INTERVAL_SECONDS = int(os.getenv("EXPECTED_INTERVAL_SECONDS", "900"))
 
 
 def build_monitoring_report(signal, previous_state, observed_at):
@@ -32,11 +32,11 @@ def build_monitoring_report(signal, previous_state, observed_at):
     return {
         "observed_at_utc": observed_at.isoformat(),
         "observation_definition": "Timestamp when this diagnostic script ran; not the exact GitHub scheduler start time.",
-        "expected_interval_seconds": EXPECTED_MONITOR_INTERVAL_SECONDS,
+        "expected_interval_seconds": EXPECTED_INTERVAL_SECONDS,
         "seconds_since_previous_observation": gap_seconds,
         "cadence_status": (
             "FIRST_OBSERVATION" if gap_seconds is None else
-            "ON_OR_NEAR_SCHEDULE" if gap_seconds <= EXPECTED_MONITOR_INTERVAL_SECONDS * 1.5 else
+            "ON_OR_NEAR_SCHEDULE" if gap_seconds <= EXPECTED_INTERVAL_SECONDS * 1.5 else
             "DELAYED_OR_MISSED_INTERVAL"
         ),
         "latest_closed_candle_timestamp_ms": candle_ms,
