@@ -193,9 +193,6 @@ jobs:
           if [ ! -s paper_state.json ] && [ -s reports-history/state/paper_state.json ]; then
             cp reports-history/state/paper_state.json paper_state.json
             echo "::warning::Paper cache was empty; restored paper state from the durable reports branch."
-          elif [ ! -s paper_state.json ] && [ -s reports-history/state/paper_state.json ] && [ ! -s paper_state.json ]; then
-            echo "::error::Paper state recovery failed."
-            exit 1
           elif [ ! -s paper_state.json ]; then
             echo "::warning::No cached or archived paper state exists; starting a new paper history. Review this warning if prior history was expected."
           else
