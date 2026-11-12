@@ -182,6 +182,7 @@ jobs:
             bitget-bot-state-${{ github.ref_name }}-
 
       - name: Restore durable paper state after a cache miss
+        if: ${{ github.event_name != 'pull_request' }}
         uses: actions/checkout@v6
         with:
           ref: reports
@@ -189,6 +190,7 @@ jobs:
           persist-credentials: false
 
       - name: Recover paper state from durable archive when cache is empty
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           if [ ! -s paper_state.json ] && [ -s reports-history/state/paper_state.json ]; then
             cp reports-history/state/paper_state.json paper_state.json
