@@ -580,7 +580,7 @@ jobs:
               cp downloaded/paper_state.json state/paper_state.json
             fi
           fi
-          cat > "$archive_dir/run-metadata.txt" <<'EOF'
+          cat > "$archive_dir/run-metadata.txt" <<EOF
           run_number=${{ github.run_number }}
           run_id=${{ github.run_id }}
           event=${{ github.event_name }}
@@ -600,7 +600,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A archive/runs/${{ github.run_number }} state/paper_state.json
+          git add -A archive/runs/${{ github.run_number }} state/
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             git add -A latest
           fi
