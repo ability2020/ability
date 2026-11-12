@@ -181,6 +181,26 @@ jobs:
           restore-keys: |
             bitget-bot-state-${{ github.ref_name }}-
 
+      - name: Restore durable paper state after a cache miss
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/checkout@v6
+        with:
+          ref: reports
+          path: reports-history
+          persist-credentials: false
+
+      - name: Recover paper state from durable archive when cache is empty
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          if [ ! -s paper_state.json ] && [ -s reports-history/state/paper_state.json ]; then
+            cp reports-history/state/paper_state.json paper_state.json
+            echo "::warning::Paper cache was empty; restored paper state from the durable reports branch."
+          elif [ ! -s paper_state.json ]; then
+            echo "::warning::No cached or archived paper state exists; starting a new paper history. Review this warning if prior history was expected."
+          else
+            echo "Paper state restored from Actions cache."
+          fi
+
       - name: Run bot signal check (one cycle, no orders)
         run: python main.py --once
 
@@ -442,6 +462,7 @@ jobs:
             multi_period_report.json
             feature_ablation_report.json
             model_selection_report.json
+            paper_state.json
           if-no-files-found: warn
           retention-days: 30
 
@@ -528,9 +549,9 @@ jobs:
 
   publish-reports:
     needs: test
-    if: ${{ always() && github.event_name == 'workflow_dispatch' }}
+    if: ${{ always() && github.event_name != 'pull_request' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 8
     permissions:
       contents: write
     concurrency:
@@ -547,17 +568,45 @@ jobs:
         continue-on-error: true
         with:
           name: paper-trading-report-run-${{ github.run_number }}
-          path: latest
+          path: downloaded
 
-      - name: Commit and push reports
+      - name: Archive reports and durable paper state
+        run: |
+          archive_dir="archive/runs/${{ github.run_number }}"
+          mkdir -p "$archive_dir" state
+          if [ -d downloaded ]; then
+            cp -a downloaded/. "$archive_dir"/
+            if [ -s downloaded/paper_state.json ]; then
+              cp downloaded/paper_state.json state/paper_state.json
+            fi
+          fi
+          cat > "$archive_dir/run-metadata.txt" <<EOF
+          run_number=${{ github.run_number }}
+          run_id=${{ github.run_id }}
+          event=${{ github.event_name }}
+          commit=${{ github.sha }}
+          archived_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          EOF
+
+      - name: Update latest report pointer for manual runs
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           mkdir -p latest
+          if [ -d downloaded ]; then
+            cp -a downloaded/. latest/
+          fi
+
+      - name: Commit and push report archive
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A latest
+          git add -A archive/runs/${{ github.run_number }} state/
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            git add -A latest
+          fi
           if git diff --cached --quiet; then
-            echo "No report changes to publish."
+            echo "No report or state changes to publish."
           else
-            git commit -m "Reports from run ${{ github.run_number }}"
+            git commit -m "Archive paper reports from run ${{ github.run_number }}"
             git push origin reports
           fi
