@@ -1,0 +1,19 @@
+{
+  "observed_at_utc": "2026-11-13T18:50:06.294461+00:00",
+  "observation_definition": "Timestamp when this diagnostic script ran; not the exact GitHub scheduler start time.",
+  "expected_interval_seconds": 900,
+  "seconds_since_previous_observation": 4239.09653,
+  "cadence_status": "DELAYED_OR_MISSED_INTERVAL",
+  "estimated_missed_intervals": 3,
+  "cadence_warning": "WARNING: observation gap exceeded the expected cadence. GitHub scheduled triggers may have been delayed or missed; this estimate does not prove which triggers were delivered.",
+  "latest_closed_candle_timestamp_ms": 1794595500000,
+  "latest_closed_candle_age_seconds": 306.2944610118866,
+  "closed_candle_count": 49,
+  "signal_record_available": true,
+  "github_run_id": "43486149060",
+  "github_run_number": "380",
+  "github_event_name": "schedule",
+  "workflow_schedule": null,
+  "state_restored": true,
+  "note": "Paper monitoring only. This measures intervals between script observations, not guaranteed scheduler delivery or exchange execution."
+}
