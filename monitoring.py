@@ -29,16 +29,33 @@ def build_monitoring_report(signal, previous_state, observed_at):
         except (TypeError, ValueError):
             candle_age_seconds = None
 
+    cadence_status = (
+        "FIRST_OBSERVATION" if gap_seconds is None else
+        "ON_OR_NEAR_SCHEDULE" if gap_seconds <= EXPECTED_INTERVAL_SECONDS * 1.5 else
+        "DELAYED_OR_MISSED_INTERVAL"
+    )
+    # This is an estimate from the gap between script observations, not a count
+    # of confirmed GitHub scheduler events.
+    estimated_missed_intervals = (
+        None if gap_seconds is None else
+        max(0, int(gap_seconds // EXPECTED_INTERVAL_SECONDS) - 1)
+    )
+    cadence_warning = (
+        "No previous observation is available; missed intervals cannot be estimated."
+        if gap_seconds is None else
+        "WARNING: observation gap exceeded the expected cadence. GitHub scheduled triggers may have been delayed or missed; this estimate does not prove which triggers were delivered."
+        if cadence_status == "DELAYED_OR_MISSED_INTERVAL" else
+        "No delayed observation gap detected."
+    )
+
     return {
         "observed_at_utc": observed_at.isoformat(),
         "observation_definition": "Timestamp when this diagnostic script ran; not the exact GitHub scheduler start time.",
         "expected_interval_seconds": EXPECTED_INTERVAL_SECONDS,
         "seconds_since_previous_observation": gap_seconds,
-        "cadence_status": (
-            "FIRST_OBSERVATION" if gap_seconds is None else
-            "ON_OR_NEAR_SCHEDULE" if gap_seconds <= EXPECTED_INTERVAL_SECONDS * 1.5 else
-            "DELAYED_OR_MISSED_INTERVAL"
-        ),
+        "cadence_status": cadence_status,
+        "estimated_missed_intervals": estimated_missed_intervals,
+        "cadence_warning": cadence_warning,
         "latest_closed_candle_timestamp_ms": candle_ms,
         "latest_closed_candle_age_seconds": candle_age_seconds,
         "closed_candle_count": signal.get("closed_candle_count"),
@@ -78,6 +95,8 @@ def main():
     REPORT_PATH.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     print("Monitoring cadence status:", report["cadence_status"])
     print("Seconds since previous observation:", report["seconds_since_previous_observation"])
+    print("Estimated missed intervals:", report["estimated_missed_intervals"])
+    print("Cadence warning:", report["cadence_warning"])
     print("Latest closed candle age (seconds):", report["latest_closed_candle_age_seconds"])
     print("State restored:", report["state_restored"])
 
