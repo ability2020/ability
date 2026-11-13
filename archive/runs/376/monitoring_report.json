@@ -1,0 +1,17 @@
+{
+  "observed_at_utc": "2026-11-13T03:41:51.005163+00:00",
+  "observation_definition": "Timestamp when this diagnostic script ran; not the exact GitHub scheduler start time.",
+  "expected_interval_seconds": 900,
+  "seconds_since_previous_observation": 14239.634021,
+  "cadence_status": "DELAYED_OR_MISSED_INTERVAL",
+  "latest_closed_candle_timestamp_ms": 1794540900000,
+  "latest_closed_candle_age_seconds": 411.00516295433044,
+  "closed_candle_count": 49,
+  "signal_record_available": true,
+  "github_run_id": "43360463277",
+  "github_run_number": "376",
+  "github_event_name": "schedule",
+  "workflow_schedule": null,
+  "state_restored": true,
+  "note": "Paper monitoring only. This measures intervals between script observations, not guaranteed scheduler delivery or exchange execution."
+}
