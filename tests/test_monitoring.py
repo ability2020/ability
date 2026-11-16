@@ -18,23 +18,32 @@ class MonitoringReportTests(unittest.TestCase):
         self.assertEqual(report["latest_closed_candle_age_seconds"], 300.0)
         self.assertFalse(report["state_restored"])
 
-    def test_delayed_observation_gap(self):
-        now = datetime(2026, 11, 9, 12, 45, tzinfo=timezone.utc)
-        previous = {"last_observed_at_utc": "2026-11-09T12:00:00+00:00"}
-        report = build_monitoring_report({}, previous, now)
-        self.assertEqual(report["seconds_since_previous_observation"], 2700.0)
+    def test_delayed_workflow_start_gap(self):
+        observed = datetime(2026, 11, 9, 12, 47, tzinfo=timezone.utc)
+        started = datetime(2026, 11, 9, 12, 45, tzinfo=timezone.utc)
+        previous = {"last_workflow_started_at_utc": "2026-11-09T12:00:00+00:00"}
+        report = build_monitoring_report({}, previous, observed, started)
+        self.assertEqual(report["seconds_since_previous_workflow_start"], 2700.0)
         self.assertEqual(report["cadence_status"], "DELAYED_OR_MISSED_INTERVAL")
         self.assertEqual(report["estimated_missed_intervals"], 2)
-        self.assertIn("may have been delayed or missed", report["cadence_warning"])
+        self.assertIn("gap between workflow start times", report["cadence_warning"])
         self.assertTrue(report["state_restored"])
 
     def test_near_schedule_gap(self):
         now = datetime(2026, 11, 9, 12, 14, tzinfo=timezone.utc)
-        previous = {"last_observed_at_utc": "2026-11-09T12:00:00+00:00"}
-        report = build_monitoring_report({}, previous, now)
+        previous = {"last_workflow_started_at_utc": "2026-11-09T12:00:00+00:00"}
+        report = build_monitoring_report({}, previous, now, now)
         self.assertEqual(report["cadence_status"], "ON_OR_NEAR_SCHEDULE")
         self.assertEqual(report["estimated_missed_intervals"], 0)
-        self.assertEqual(report["cadence_warning"], "No delayed observation gap detected.")
+        self.assertEqual(report["cadence_warning"], "No delayed workflow-start gap detected.")
+
+    def test_long_job_duration_does_not_inflate_cadence_gap(self):
+        observed = datetime(2026, 11, 9, 12, 30, tzinfo=timezone.utc)
+        started = datetime(2026, 11, 9, 12, 15, tzinfo=timezone.utc)
+        previous = {"last_workflow_started_at_utc": "2026-11-09T12:00:00+00:00"}
+        report = build_monitoring_report({}, previous, observed, started)
+        self.assertEqual(report["seconds_since_previous_workflow_start"], 900.0)
+        self.assertEqual(report["cadence_status"], "ON_OR_NEAR_SCHEDULE")
 
 
 if __name__ == "__main__":
