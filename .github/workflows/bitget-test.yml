@@ -285,6 +285,9 @@ jobs:
 
       - name: Record monitoring cadence and candle freshness
         if: always()
+        env:
+          MONITOR_WORKFLOW_STARTED_AT: ${{ github.run_started_at }}
+          MONITOR_WORKFLOW_SCHEDULE: ${{ github.event.schedule }}
         run: python monitoring.py
 
       - name: Create paper-trading performance report
