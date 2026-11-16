@@ -316,7 +316,7 @@ jobs:
           if not started_at:
               raise SystemExit("GitHub API did not return run_started_at; refusing silent fallback.")
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
-              env_file.write(f"MONITOR_WORKFLOW_STARTED_AT={started_at}\\n")
+              env_file.write(f"MONITOR_WORKFLOW_STARTED_AT={started_at}\n")
           print("Retrieved workflow start timestamp:", started_at)
           PY
 
