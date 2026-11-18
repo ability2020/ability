@@ -2,7 +2,7 @@ const OWNER = "ability2020";
 const REPO = "ability";
 const WORKFLOW = "bitget-test.yml";
 const BRANCH = "main";
-const MAX_AGE_MINUTES = 25;
+const MAX_AGE_MINUTES = 35;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
