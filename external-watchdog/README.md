@@ -1,18 +1,18 @@
 # External paper-monitor watchdog
 
-This is an independent **backup trigger**, not a replacement for the existing GitHub schedule. It checks whether the workflow has run recently and only dispatches a paper-monitor run when the latest run is older than 25 minutes.
+This is an independent **backup trigger**, not a replacement for the existing GitHub schedule. It checks whether the workflow has run recently and only dispatches a paper-monitor run when the latest run is older than 35 minutes.
 
 ## Safety and behavior
 
 - Existing GitHub cron remains `7,22,37,52 * * * *` UTC.
 - Configure cron-job.org to call the Worker at minutes `10,25,40,55` every hour (UTC). These checks happen three minutes after the expected GitHub schedule slots.
 - A healthy recent run means the Worker returns `skipped_recent_run` and does not dispatch anything.
-- If no workflow run has started within 25 minutes, the Worker dispatches the existing `bitget-test.yml` workflow on `main`.
+- If no workflow run has started within 35 minutes, the Worker dispatches the existing `bitget-test.yml` workflow on `main`.
 - Backup dispatches set `run_historical_research=false`, so they do not start the long 5m/1H/4H research matrix.
 - The Worker never calls Bitget and never places exchange orders.
 - The Worker uses a GitHub fine-grained token with **Actions: write** permission, restricted to this repository. No token is stored in this repository.
 
-The 25-minute threshold means a single missed native schedule is normally covered by the next native run; the watchdog intervenes only after a longer gap. The watchdog is best-effort and does not guarantee uninterrupted GitHub Actions availability.
+The 35-minute threshold is deliberately conservative: one or two missed native schedule slots are given time for the next native trigger to recover. The watchdog intervenes only after three consecutive native schedule opportunities appear to have been missed, reducing the chance of creating a duplicate paper cycle just before the next scheduled slot. The watchdog is best-effort and does not guarantee uninterrupted GitHub Actions availability.
 
 ## 1. Create a fine-grained GitHub token
 
