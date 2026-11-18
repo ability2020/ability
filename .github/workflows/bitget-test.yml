@@ -2,6 +2,20 @@ name: Bitget Demo Bot Test
 
 on:
   workflow_dispatch:
+    inputs:
+      run_historical_research:
+        description: "Run the long historical research matrix"
+        required: false
+        type: boolean
+        default: true
+      trigger_source:
+        description: "Who initiated this workflow"
+        required: false
+        type: choice
+        options:
+          - manual
+          - external_watchdog
+        default: manual
   pull_request:
     branches: [main]
   push:
@@ -507,7 +521,7 @@ jobs:
 
 
   historical-research:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_historical_research }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
