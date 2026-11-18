@@ -49,6 +49,20 @@ export default {
           return json({ ok: false, error: "Latest workflow run has no usable timestamp" }, 502);
         }
 
+        // Never dispatch a second cycle while the latest workflow is still queued or running.
+        // This protects against duplicate paper cycles if a GitHub job runs unusually long.
+        if (latest.status === "queued" || latest.status === "in_progress") {
+          return json({
+            ok: true,
+            action: "skipped_active_run",
+            latest_run_number: latest.run_number,
+            latest_event: latest.event,
+            latest_status: latest.status,
+            age_minutes: Number(((now - started) / 60000).toFixed(1)),
+            threshold_minutes: MAX_AGE_MINUTES,
+          });
+        }
+
         const ageMinutes = (now - started) / 60000;
         if (ageMinutes <= MAX_AGE_MINUTES) {
           return json({
