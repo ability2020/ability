@@ -1,0 +1,20 @@
+{
+  "observed_at_utc": "2026-11-18T16:18:18.347926+00:00",
+  "workflow_started_at_utc": "2026-11-18T16:16:21+00:00",
+  "observation_definition": "Cadence uses GitHub Actions workflow start time; candle freshness uses the time this diagnostic script executed.",
+  "expected_interval_seconds": 900,
+  "seconds_since_previous_workflow_start": 25036.0,
+  "cadence_status": "DELAYED_OR_MISSED_INTERVAL",
+  "estimated_missed_intervals": 26,
+  "cadence_warning": "WARNING: gap between workflow start times exceeded the expected cadence. This indicates delayed or absent workflow starts, but does not identify whether GitHub delayed, dropped, or queued a scheduled trigger.",
+  "latest_closed_candle_timestamp_ms": 1795018200000,
+  "latest_closed_candle_age_seconds": 498.34792590141296,
+  "closed_candle_count": 49,
+  "signal_record_available": true,
+  "github_run_id": "44345276250",
+  "github_run_number": "404",
+  "github_event_name": "push",
+  "workflow_schedule": "",
+  "state_restored": true,
+  "note": "Paper monitoring only. Workflow-start gaps are evidence of run cadence, not proof of the scheduler's internal delivery behavior or exchange execution."
+}
