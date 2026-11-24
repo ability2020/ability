@@ -1,0 +1,1336 @@
+{
+  "monitoring": {
+    "observed_at_utc": "2026-11-24T01:53:32.809549+00:00",
+    "workflow_started_at_utc": "2026-11-24T01:51:42+00:00",
+    "observation_definition": "Cadence uses GitHub Actions workflow start time; candle freshness uses the time this diagnostic script executed.",
+    "expected_interval_seconds": 900,
+    "seconds_since_previous_workflow_start": 41086.0,
+    "cadence_status": "DELAYED_OR_MISSED_INTERVAL",
+    "estimated_missed_intervals": 44,
+    "cadence_warning": "WARNING: gap between workflow start times exceeded the expected cadence. This indicates delayed or absent workflow starts, but does not identify whether GitHub delayed, dropped, or queued a scheduled trigger.",
+    "latest_closed_candle_timestamp_ms": 1795484700000,
+    "latest_closed_candle_age_seconds": 512.8095490932465,
+    "closed_candle_count": 49,
+    "signal_record_available": true,
+    "github_run_id": "45308145593",
+    "github_run_number": "423",
+    "github_event_name": "schedule",
+    "workflow_schedule": "7,22,37,52 * * * *",
+    "state_restored": true,
+    "note": "Paper monitoring only. Workflow-start gaps are evidence of run cadence, not proof of the scheduler's internal delivery behavior or exchange execution."
+  },
+  "report_type": "paper-trading-only-with-market-signal",
+  "created_at_utc": "2026-11-24T01:53:32.853985+00:00",
+  "github_run_id": "45308145593",
+  "github_run_number": "423",
+  "symbol": "BTCUSDT",
+  "interval": "5m",
+  "latest_market_signal": {
+    "record_type": "actual-market-signal-paper-only",
+    "created_at_utc": "2026-11-24T01:53:32.371771+00:00",
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "signal": "BUY",
+    "signal_price": 61224.31,
+    "ticker_price": 61216.94,
+    "indicator_score": 2,
+    "sma_9": 61496.752222222225,
+    "sma_21": 61360.862380952385,
+    "rsi_14": 50.65320376260932,
+    "last_closed_candle_timestamp": 1795484700000,
+    "closed_candle_count": 49,
+    "signal_reason": "Signal uses confirmed closed candles only; no orders are sent by this version",
+    "risk_decision": "WAIT",
+    "risk_reason": "Insufficient available USDT for the configured demo trade.",
+    "risk_decision_scope": "BUY entries require BUY_CANDIDATE; SELL may close an existing hypothetical paper position because real BTC balance is separate from simulated holdings.",
+    "paper_trading_mode": "Risk-gated hypothetical position; no exchange order is sent.",
+    "paper_signal": "WAIT",
+    "paper_event": "HOLD_CASH",
+    "paper_event_reason": "No qualifying simulated action.",
+    "simulated_realized_pnl_usdt_gross": 0.0,
+    "closed_trade_count": 0,
+    "open_position": null,
+    "note": "Signal from retrieved market data. Hypothetical BUY entries are blocked unless the risk engine returns BUY_CANDIDATE. A SELL signal can close an existing simulated position independently of real BTC holdings. No exchange order was sent."
+  },
+  "experimental_learning_model": {
+    "model_version": "logistic-direction-v2-expanded-features",
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "candle_count": 17280,
+    "labelled_sample_count": 17246,
+    "train_sample_count": 13796,
+    "test_sample_count": 3450,
+    "test_accuracy": 0.5063768115942029,
+    "test_balanced_accuracy": 0.5063495239625557,
+    "majority_baseline_accuracy": 0.4756521739130435,
+    "majority_baseline_balanced_accuracy": 0.5,
+    "test_beats_baseline": true,
+    "probability_brier_score": 0.2506777574079325,
+    "brier_score_note": "Lower is better; 0 is perfect and 0.25 is the reference score for constant 0.5 probabilities on a balanced binary target.",
+    "buy_threshold_for_diagnostics": 0.58,
+    "buy_threshold_precision": 0.49038461538461536,
+    "buy_threshold_recall": 0.031078610603290677,
+    "confusion_matrix": {
+      "true_negative": 917,
+      "false_positive": 892,
+      "false_negative": 811,
+      "true_positive": 830
+    },
+    "latest_candle_timestamp": 1795484700000,
+    "latest_close": 61224.31,
+    "next_candle_up_probability": 0.5630053704202048,
+    "model_signal": "WAIT",
+    "signal_reason": "Model probability is too uncertain; no directional signal.",
+    "evaluation_method": "Chronological 80/20 holdout; features use current/past candles only.",
+    "safety_note": "Experimental research output only. Model signal does not control paper trades or submit exchange orders. Holdout results are not proof of profitability; fees, slippage and regime changes are not fully modelled.",
+    "candle_fetch": {
+      "endpoint": "/api/v3/market/history-candles",
+      "requested_lookback_days": 60,
+      "interval": "5m",
+      "page_limit": 100,
+      "requests": [
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792863000000,
+          "newest_timestamp": 1792892700000,
+          "cursor_end_ms": 1792893000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792833000000,
+          "newest_timestamp": 1792862700000,
+          "cursor_end_ms": 1792863000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792803000000,
+          "newest_timestamp": 1792832700000,
+          "cursor_end_ms": 1792833000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792773000000,
+          "newest_timestamp": 1792802700000,
+          "cursor_end_ms": 1792803000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792743000000,
+          "newest_timestamp": 1792772700000,
+          "cursor_end_ms": 1792773000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792713000000,
+          "newest_timestamp": 1792742700000,
+          "cursor_end_ms": 1792743000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792683000000,
+          "newest_timestamp": 1792712700000,
+          "cursor_end_ms": 1792713000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792653000000,
+          "newest_timestamp": 1792682700000,
+          "cursor_end_ms": 1792683000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792623000000,
+          "newest_timestamp": 1792652700000,
+          "cursor_end_ms": 1792653000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792593000000,
+          "newest_timestamp": 1792622700000,
+          "cursor_end_ms": 1792623000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792563000000,
+          "newest_timestamp": 1792592700000,
+          "cursor_end_ms": 1792593000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792533000000,
+          "newest_timestamp": 1792562700000,
+          "cursor_end_ms": 1792563000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792503000000,
+          "newest_timestamp": 1792532700000,
+          "cursor_end_ms": 1792533000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792473000000,
+          "newest_timestamp": 1792502700000,
+          "cursor_end_ms": 1792503000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792443000000,
+          "newest_timestamp": 1792472700000,
+          "cursor_end_ms": 1792473000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792413000000,
+          "newest_timestamp": 1792442700000,
+          "cursor_end_ms": 1792443000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792383000000,
+          "newest_timestamp": 1792412700000,
+          "cursor_end_ms": 1792413000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792353000000,
+          "newest_timestamp": 1792382700000,
+          "cursor_end_ms": 1792383000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792323000000,
+          "newest_timestamp": 1792352700000,
+          "cursor_end_ms": 1792353000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792293000000,
+          "newest_timestamp": 1792322700000,
+          "cursor_end_ms": 1792323000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792263000000,
+          "newest_timestamp": 1792292700000,
+          "cursor_end_ms": 1792293000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792233000000,
+          "newest_timestamp": 1792262700000,
+          "cursor_end_ms": 1792263000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792203000000,
+          "newest_timestamp": 1792232700000,
+          "cursor_end_ms": 1792233000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792173000000,
+          "newest_timestamp": 1792202700000,
+          "cursor_end_ms": 1792203000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792143000000,
+          "newest_timestamp": 1792172700000,
+          "cursor_end_ms": 1792173000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792113000000,
+          "newest_timestamp": 1792142700000,
+          "cursor_end_ms": 1792143000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792083000000,
+          "newest_timestamp": 1792112700000,
+          "cursor_end_ms": 1792113000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792053000000,
+          "newest_timestamp": 1792082700000,
+          "cursor_end_ms": 1792083000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792023000000,
+          "newest_timestamp": 1792052700000,
+          "cursor_end_ms": 1792053000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791993000000,
+          "newest_timestamp": 1792022700000,
+          "cursor_end_ms": 1792023000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791963000000,
+          "newest_timestamp": 1791992700000,
+          "cursor_end_ms": 1791993000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791933000000,
+          "newest_timestamp": 1791962700000,
+          "cursor_end_ms": 1791963000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791903000000,
+          "newest_timestamp": 1791932700000,
+          "cursor_end_ms": 1791933000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791873000000,
+          "newest_timestamp": 1791902700000,
+          "cursor_end_ms": 1791903000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791843000000,
+          "newest_timestamp": 1791872700000,
+          "cursor_end_ms": 1791873000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791813000000,
+          "newest_timestamp": 1791842700000,
+          "cursor_end_ms": 1791843000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791783000000,
+          "newest_timestamp": 1791812700000,
+          "cursor_end_ms": 1791813000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791753000000,
+          "newest_timestamp": 1791782700000,
+          "cursor_end_ms": 1791783000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791723000000,
+          "newest_timestamp": 1791752700000,
+          "cursor_end_ms": 1791753000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791693000000,
+          "newest_timestamp": 1791722700000,
+          "cursor_end_ms": 1791723000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791663000000,
+          "newest_timestamp": 1791692700000,
+          "cursor_end_ms": 1791693000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791633000000,
+          "newest_timestamp": 1791662700000,
+          "cursor_end_ms": 1791663000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791603000000,
+          "newest_timestamp": 1791632700000,
+          "cursor_end_ms": 1791633000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791573000000,
+          "newest_timestamp": 1791602700000,
+          "cursor_end_ms": 1791603000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791543000000,
+          "newest_timestamp": 1791572700000,
+          "cursor_end_ms": 1791573000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791513000000,
+          "newest_timestamp": 1791542700000,
+          "cursor_end_ms": 1791543000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791483000000,
+          "newest_timestamp": 1791512700000,
+          "cursor_end_ms": 1791513000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791453000000,
+          "newest_timestamp": 1791482700000,
+          "cursor_end_ms": 1791483000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791423000000,
+          "newest_timestamp": 1791452700000,
+          "cursor_end_ms": 1791453000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791393000000,
+          "newest_timestamp": 1791422700000,
+          "cursor_end_ms": 1791423000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791363000000,
+          "newest_timestamp": 1791392700000,
+          "cursor_end_ms": 1791393000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791333000000,
+          "newest_timestamp": 1791362700000,
+          "cursor_end_ms": 1791363000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791303000000,
+          "newest_timestamp": 1791332700000,
+          "cursor_end_ms": 1791333000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791273000000,
+          "newest_timestamp": 1791302700000,
+          "cursor_end_ms": 1791303000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791243000000,
+          "newest_timestamp": 1791272700000,
+          "cursor_end_ms": 1791273000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791213000000,
+          "newest_timestamp": 1791242700000,
+          "cursor_end_ms": 1791243000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791183000000,
+          "newest_timestamp": 1791212700000,
+          "cursor_end_ms": 1791213000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791153000000,
+          "newest_timestamp": 1791182700000,
+          "cursor_end_ms": 1791183000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791123000000,
+          "newest_timestamp": 1791152700000,
+          "cursor_end_ms": 1791153000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791093000000,
+          "newest_timestamp": 1791122700000,
+          "cursor_end_ms": 1791123000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791063000000,
+          "newest_timestamp": 1791092700000,
+          "cursor_end_ms": 1791093000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791033000000,
+          "newest_timestamp": 1791062700000,
+          "cursor_end_ms": 1791063000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1791003000000,
+          "newest_timestamp": 1791032700000,
+          "cursor_end_ms": 1791033000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790973000000,
+          "newest_timestamp": 1791002700000,
+          "cursor_end_ms": 1791003000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790943000000,
+          "newest_timestamp": 1790972700000,
+          "cursor_end_ms": 1790973000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790913000000,
+          "newest_timestamp": 1790942700000,
+          "cursor_end_ms": 1790943000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790883000000,
+          "newest_timestamp": 1790912700000,
+          "cursor_end_ms": 1790913000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790853000000,
+          "newest_timestamp": 1790882700000,
+          "cursor_end_ms": 1790883000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790823000000,
+          "newest_timestamp": 1790852700000,
+          "cursor_end_ms": 1790853000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790793000000,
+          "newest_timestamp": 1790822700000,
+          "cursor_end_ms": 1790823000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790763000000,
+          "newest_timestamp": 1790792700000,
+          "cursor_end_ms": 1790793000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790733000000,
+          "newest_timestamp": 1790762700000,
+          "cursor_end_ms": 1790763000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790703000000,
+          "newest_timestamp": 1790732700000,
+          "cursor_end_ms": 1790733000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790673000000,
+          "newest_timestamp": 1790702700000,
+          "cursor_end_ms": 1790703000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790643000000,
+          "newest_timestamp": 1790672700000,
+          "cursor_end_ms": 1790673000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790613000000,
+          "newest_timestamp": 1790642700000,
+          "cursor_end_ms": 1790643000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790583000000,
+          "newest_timestamp": 1790612700000,
+          "cursor_end_ms": 1790613000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790553000000,
+          "newest_timestamp": 1790582700000,
+          "cursor_end_ms": 1790583000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790523000000,
+          "newest_timestamp": 1790552700000,
+          "cursor_end_ms": 1790553000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790493000000,
+          "newest_timestamp": 1790522700000,
+          "cursor_end_ms": 1790523000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790463000000,
+          "newest_timestamp": 1790492700000,
+          "cursor_end_ms": 1790493000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790433000000,
+          "newest_timestamp": 1790462700000,
+          "cursor_end_ms": 1790463000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790403000000,
+          "newest_timestamp": 1790432700000,
+          "cursor_end_ms": 1790433000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790373000000,
+          "newest_timestamp": 1790402700000,
+          "cursor_end_ms": 1790403000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790343000000,
+          "newest_timestamp": 1790372700000,
+          "cursor_end_ms": 1790373000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1790313000000,
+          "newest_timestamp": 1790342700000,
+          "cursor_end_ms": 1790343000000
+        },
+        {
+          "rows_received": 40,
+          "new_rows": 40,
+          "oldest_timestamp": 1790301000000,
+          "newest_timestamp": 1790312700000,
+          "cursor_end_ms": 1790313000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795455000000,
+          "newest_timestamp": 1795484700000,
+          "cursor_end_ms": 1795485000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795425000000,
+          "newest_timestamp": 1795454700000,
+          "cursor_end_ms": 1795455000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795395000000,
+          "newest_timestamp": 1795424700000,
+          "cursor_end_ms": 1795425000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795365000000,
+          "newest_timestamp": 1795394700000,
+          "cursor_end_ms": 1795395000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795335000000,
+          "newest_timestamp": 1795364700000,
+          "cursor_end_ms": 1795365000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795305000000,
+          "newest_timestamp": 1795334700000,
+          "cursor_end_ms": 1795335000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795275000000,
+          "newest_timestamp": 1795304700000,
+          "cursor_end_ms": 1795305000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795245000000,
+          "newest_timestamp": 1795274700000,
+          "cursor_end_ms": 1795275000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795215000000,
+          "newest_timestamp": 1795244700000,
+          "cursor_end_ms": 1795245000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795185000000,
+          "newest_timestamp": 1795214700000,
+          "cursor_end_ms": 1795215000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795155000000,
+          "newest_timestamp": 1795184700000,
+          "cursor_end_ms": 1795185000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795125000000,
+          "newest_timestamp": 1795154700000,
+          "cursor_end_ms": 1795155000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795095000000,
+          "newest_timestamp": 1795124700000,
+          "cursor_end_ms": 1795125000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795065000000,
+          "newest_timestamp": 1795094700000,
+          "cursor_end_ms": 1795095000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795035000000,
+          "newest_timestamp": 1795064700000,
+          "cursor_end_ms": 1795065000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1795005000000,
+          "newest_timestamp": 1795034700000,
+          "cursor_end_ms": 1795035000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794975000000,
+          "newest_timestamp": 1795004700000,
+          "cursor_end_ms": 1795005000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794945000000,
+          "newest_timestamp": 1794974700000,
+          "cursor_end_ms": 1794975000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794915000000,
+          "newest_timestamp": 1794944700000,
+          "cursor_end_ms": 1794945000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794885000000,
+          "newest_timestamp": 1794914700000,
+          "cursor_end_ms": 1794915000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794855000000,
+          "newest_timestamp": 1794884700000,
+          "cursor_end_ms": 1794885000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794825000000,
+          "newest_timestamp": 1794854700000,
+          "cursor_end_ms": 1794855000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794795000000,
+          "newest_timestamp": 1794824700000,
+          "cursor_end_ms": 1794825000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794765000000,
+          "newest_timestamp": 1794794700000,
+          "cursor_end_ms": 1794795000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794735000000,
+          "newest_timestamp": 1794764700000,
+          "cursor_end_ms": 1794765000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794705000000,
+          "newest_timestamp": 1794734700000,
+          "cursor_end_ms": 1794735000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794675000000,
+          "newest_timestamp": 1794704700000,
+          "cursor_end_ms": 1794705000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794645000000,
+          "newest_timestamp": 1794674700000,
+          "cursor_end_ms": 1794675000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794615000000,
+          "newest_timestamp": 1794644700000,
+          "cursor_end_ms": 1794645000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794585000000,
+          "newest_timestamp": 1794614700000,
+          "cursor_end_ms": 1794615000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794555000000,
+          "newest_timestamp": 1794584700000,
+          "cursor_end_ms": 1794585000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794525000000,
+          "newest_timestamp": 1794554700000,
+          "cursor_end_ms": 1794555000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794495000000,
+          "newest_timestamp": 1794524700000,
+          "cursor_end_ms": 1794525000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794465000000,
+          "newest_timestamp": 1794494700000,
+          "cursor_end_ms": 1794495000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794435000000,
+          "newest_timestamp": 1794464700000,
+          "cursor_end_ms": 1794465000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794405000000,
+          "newest_timestamp": 1794434700000,
+          "cursor_end_ms": 1794435000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794375000000,
+          "newest_timestamp": 1794404700000,
+          "cursor_end_ms": 1794405000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794345000000,
+          "newest_timestamp": 1794374700000,
+          "cursor_end_ms": 1794375000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794315000000,
+          "newest_timestamp": 1794344700000,
+          "cursor_end_ms": 1794345000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794285000000,
+          "newest_timestamp": 1794314700000,
+          "cursor_end_ms": 1794315000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794255000000,
+          "newest_timestamp": 1794284700000,
+          "cursor_end_ms": 1794285000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794225000000,
+          "newest_timestamp": 1794254700000,
+          "cursor_end_ms": 1794255000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794195000000,
+          "newest_timestamp": 1794224700000,
+          "cursor_end_ms": 1794225000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794165000000,
+          "newest_timestamp": 1794194700000,
+          "cursor_end_ms": 1794195000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794135000000,
+          "newest_timestamp": 1794164700000,
+          "cursor_end_ms": 1794165000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794105000000,
+          "newest_timestamp": 1794134700000,
+          "cursor_end_ms": 1794135000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794075000000,
+          "newest_timestamp": 1794104700000,
+          "cursor_end_ms": 1794105000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794045000000,
+          "newest_timestamp": 1794074700000,
+          "cursor_end_ms": 1794075000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1794015000000,
+          "newest_timestamp": 1794044700000,
+          "cursor_end_ms": 1794045000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793985000000,
+          "newest_timestamp": 1794014700000,
+          "cursor_end_ms": 1794015000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793955000000,
+          "newest_timestamp": 1793984700000,
+          "cursor_end_ms": 1793985000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793925000000,
+          "newest_timestamp": 1793954700000,
+          "cursor_end_ms": 1793955000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793895000000,
+          "newest_timestamp": 1793924700000,
+          "cursor_end_ms": 1793925000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793865000000,
+          "newest_timestamp": 1793894700000,
+          "cursor_end_ms": 1793895000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793835000000,
+          "newest_timestamp": 1793864700000,
+          "cursor_end_ms": 1793865000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793805000000,
+          "newest_timestamp": 1793834700000,
+          "cursor_end_ms": 1793835000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793775000000,
+          "newest_timestamp": 1793804700000,
+          "cursor_end_ms": 1793805000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793745000000,
+          "newest_timestamp": 1793774700000,
+          "cursor_end_ms": 1793775000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793715000000,
+          "newest_timestamp": 1793744700000,
+          "cursor_end_ms": 1793745000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793685000000,
+          "newest_timestamp": 1793714700000,
+          "cursor_end_ms": 1793715000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793655000000,
+          "newest_timestamp": 1793684700000,
+          "cursor_end_ms": 1793685000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793625000000,
+          "newest_timestamp": 1793654700000,
+          "cursor_end_ms": 1793655000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793595000000,
+          "newest_timestamp": 1793624700000,
+          "cursor_end_ms": 1793625000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793565000000,
+          "newest_timestamp": 1793594700000,
+          "cursor_end_ms": 1793595000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793535000000,
+          "newest_timestamp": 1793564700000,
+          "cursor_end_ms": 1793565000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793505000000,
+          "newest_timestamp": 1793534700000,
+          "cursor_end_ms": 1793535000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793475000000,
+          "newest_timestamp": 1793504700000,
+          "cursor_end_ms": 1793505000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793445000000,
+          "newest_timestamp": 1793474700000,
+          "cursor_end_ms": 1793475000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793415000000,
+          "newest_timestamp": 1793444700000,
+          "cursor_end_ms": 1793445000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793385000000,
+          "newest_timestamp": 1793414700000,
+          "cursor_end_ms": 1793415000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793355000000,
+          "newest_timestamp": 1793384700000,
+          "cursor_end_ms": 1793385000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793325000000,
+          "newest_timestamp": 1793354700000,
+          "cursor_end_ms": 1793355000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793295000000,
+          "newest_timestamp": 1793324700000,
+          "cursor_end_ms": 1793325000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793265000000,
+          "newest_timestamp": 1793294700000,
+          "cursor_end_ms": 1793295000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793235000000,
+          "newest_timestamp": 1793264700000,
+          "cursor_end_ms": 1793265000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793205000000,
+          "newest_timestamp": 1793234700000,
+          "cursor_end_ms": 1793235000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793175000000,
+          "newest_timestamp": 1793204700000,
+          "cursor_end_ms": 1793205000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793145000000,
+          "newest_timestamp": 1793174700000,
+          "cursor_end_ms": 1793175000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793115000000,
+          "newest_timestamp": 1793144700000,
+          "cursor_end_ms": 1793145000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793085000000,
+          "newest_timestamp": 1793114700000,
+          "cursor_end_ms": 1793115000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793055000000,
+          "newest_timestamp": 1793084700000,
+          "cursor_end_ms": 1793085000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1793025000000,
+          "newest_timestamp": 1793054700000,
+          "cursor_end_ms": 1793055000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792995000000,
+          "newest_timestamp": 1793024700000,
+          "cursor_end_ms": 1793025000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792965000000,
+          "newest_timestamp": 1792994700000,
+          "cursor_end_ms": 1792995000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792935000000,
+          "newest_timestamp": 1792964700000,
+          "cursor_end_ms": 1792965000000
+        },
+        {
+          "rows_received": 100,
+          "new_rows": 100,
+          "oldest_timestamp": 1792905000000,
+          "newest_timestamp": 1792934700000,
+          "cursor_end_ms": 1792935000000
+        },
+        {
+          "rows_received": 40,
+          "new_rows": 40,
+          "oldest_timestamp": 1792893000000,
+          "newest_timestamp": 1792904700000,
+          "cursor_end_ms": 1792905000000
+        }
+      ],
+      "gap_count": 0,
+      "missing_interval_count": 0,
+      "gap_examples": [],
+      "total_rows": 17280,
+      "request_count": 174,
+      "oldest_timestamp": 1790301000000,
+      "newest_timestamp": 1795484700000
+    },
+    "created_at_utc": "2026-11-24T01:53:26.832717+00:00"
+  },
+  "walk_forward_evaluation": null,
+  "realized_pnl_usdt_gross": 0.0,
+  "recorded_closed_trades_gross_pnl_usdt": 0.0,
+  "recorded_closed_trades_estimated_costs_usdt": 0.0,
+  "recorded_closed_trades_estimated_net_pnl_usdt": 0.0,
+  "closed_trade_count": 0,
+  "open_position": null,
+  "open_position_unrealized_pnl": null,
+  "closed_trades": [],
+  "cost_assumptions": {
+    "fee_rate_each_side": 0.001,
+    "slippage_rate_each_side": 0.0005,
+    "note": "Estimated costs are not actual Bitget fills. Closed-trade estimates cover the trades retained in paper state; cumulative gross realized PnL may include older trades no longer retained."
+  },
+  "note": "Simulated results only. Paper positions are hypothetical and independent of real exchange balances. No exchange order is sent. Gross and estimated net PnL are reported separately."
+}
